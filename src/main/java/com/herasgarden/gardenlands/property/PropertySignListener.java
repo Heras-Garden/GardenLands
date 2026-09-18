@@ -9,6 +9,7 @@ import com.herasgarden.gardencore.api.organization.OrganizationDirectory;
 import com.herasgarden.gardencore.api.ui.GardenMessages;
 import com.herasgarden.gardenlands.claim.ClaimDirectory;
 import com.herasgarden.gardenlands.claim.LandClaimRecord;
+import com.herasgarden.gardenlands.container.ContainerKey;
 import com.herasgarden.gardenlands.container.ContainerPermissionService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -28,6 +29,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -91,6 +93,21 @@ public final class PropertySignListener implements Listener {
             return;
         }
 
+        try {
+            if (tryHandleSimpleApartmentSign(event, player, signBlock)) {
+                return;
+            }
+        } catch (IllegalArgumentException exception) {
+            GardenMessages.send(player, exception.getMessage());
+            return;
+        } catch (SQLException exception) {
+            plugin.getLogger().severe(
+                    "Could not create/bind apartment sign at "
+                            + signBlock.getLocation() + ": " + exception.getMessage());
+            GardenMessages.send(player, "That apartment sign could not be saved.");
+            return;
+        }
+
         String road = safe(event.getLine(0));
         String lineTwo = safe(event.getLine(1));
         String priceText = safe(event.getLine(2));
@@ -99,7 +116,7 @@ public final class PropertySignListener implements Listener {
         }
 
         Block support = attachedSupport(signBlock);
-        boolean onChest = support != null && support.getState() instanceof Chest;
+        boolean onChest = support != null && ContainerKey.supported(support);
         PropertyAddress property = properties.findByDisplayAddress(road, lineTwo).orElse(null);
         LandClaimRecord claim = property == null ? null : claims.find(property.claimId()).orElse(null);
         boolean apartmentMailboxCandidate = property != null && claim != null
@@ -126,7 +143,7 @@ public final class PropertySignListener implements Listener {
                         : claimTouchingSign(signBlock);
                 if (anchorClaim == null || !canManage(player, anchorClaim)) {
                     GardenMessages.send(player,
-                            "The sign must be attached to this property's wall or mailbox chest.");
+                            "The sign must be attached to this property's wall or mailbox container.");
                     return;
                 }
                 if (isType(anchorClaim, "TERRITORY")) {
@@ -138,7 +155,7 @@ public final class PropertySignListener implements Listener {
                 if (isType(anchorClaim, "APARTMENT")) {
                     if (onChest) {
                         GardenMessages.send(player,
-                                "Place the apartment room sign first. Then place the matching sign on the mailbox chest.");
+                                "Place the apartment room sign first. Then place the matching sign on the mailbox container.");
                         return;
                     }
                     if (support == null || !isWallSign(signBlock)) {
@@ -159,15 +176,15 @@ public final class PropertySignListener implements Listener {
                 } else {
                     if (!onChest) {
                         GardenMessages.send(player,
-                                "This property's sign must be placed on the front of its mailbox chest.");
+                                "This property's sign must be placed on the front of its mailbox container.");
                         return;
                     }
                     if (!isFrontOfChest(signBlock, support)) {
-                        GardenMessages.send(player, "Place the sign on the front face of the mailbox chest.");
+                        GardenMessages.send(player, "Place the sign on the front face of the mailbox container.");
                         return;
                     }
                     if (!anchorClaim.contains(support.getX(), support.getY(), support.getZ())) {
-                        GardenMessages.send(player, "The mailbox chest must be inside the property claim.");
+                        GardenMessages.send(player, "The mailbox container must be inside the property claim.");
                         return;
                     }
                     property = properties.register(anchorClaim.id(), road, lineTwo, null);
@@ -178,12 +195,12 @@ public final class PropertySignListener implements Listener {
             } else if (isType(claim, "APARTMENT")) {
                 if (onChest) {
                     if (!isFrontOfChest(signBlock, support)) {
-                        GardenMessages.send(player, "Place the mailbox sign on the front face of the chest.");
+                        GardenMessages.send(player, "Place the mailbox sign on the front face of the mailbox container.");
                         return;
                     }
                     if (!mailboxAllowedForApartment(support, claim)) {
                         GardenMessages.send(player,
-                                "The apartment mailbox chest must be inside the apartment or one of its parent building claims.");
+                                "The apartment mailbox container must be inside the apartment or one of its parent building claims.");
                         return;
                     }
                     kind = PropertySignKind.APARTMENT_MAILBOX;
@@ -198,11 +215,11 @@ public final class PropertySignListener implements Listener {
             } else {
                 if (!onChest || !isFrontOfChest(signBlock, support)) {
                     GardenMessages.send(player,
-                            "This property's sign must be on the front of its mailbox chest.");
+                            "This property's sign must be on the front of its mailbox container.");
                     return;
                 }
                 if (!claim.contains(support.getX(), support.getY(), support.getZ())) {
-                    GardenMessages.send(player, "The mailbox chest must be inside the property claim.");
+                    GardenMessages.send(player, "The mailbox container must be inside the property claim.");
                     return;
                 }
                 kind = PropertySignKind.PROPERTY_MAILBOX;
@@ -210,6 +227,11 @@ public final class PropertySignListener implements Listener {
 
             if (kind == PropertySignKind.PROPERTY_MAILBOX
                     || kind == PropertySignKind.APARTMENT_MAILBOX) {
+                if (!ContainerKey.single(support)) {
+                    GardenMessages.send(player,
+                            "A registered mailbox must be a single container and cannot be a double chest.");
+                    return;
+                }
                 PropertyAddress mailboxOwner = properties
                         .propertyForMailbox(PropertyBlockPosition.from(support.getLocation()))
                         .orElse(null);
@@ -254,7 +276,7 @@ public final class PropertySignListener implements Listener {
                                     + finalProperty.display() + " for ⟡ " + finalProperty.price() + ".");
                     if (!properties.apartmentSetupComplete(finalProperty.propertyId())) {
                         GardenMessages.send(player,
-                                "Now place the matching sign on the front of the apartment's mailbox chest.");
+                                "Now place the matching sign on the front of the apartment's mailbox container.");
                     }
                 } else if (finalKind == PropertySignKind.APARTMENT_MAILBOX) {
                     GardenMessages.send(player,
@@ -274,6 +296,20 @@ public final class PropertySignListener implements Listener {
                             + signBlock.getLocation() + ": " + exception.getMessage());
             GardenMessages.send(player, "That property sign could not be saved.");
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onMailboxExtension(BlockPlaceEvent event) {
+        Block block = event.getBlockPlaced();
+        if (!ContainerKey.supported(block)) {
+            return;
+        }
+        if (ContainerKey.members(block).size() < 2 || !containers.isMailbox(block)) {
+            return;
+        }
+        event.setCancelled(true);
+        GardenMessages.send(event.getPlayer(),
+                "A registered mailbox cannot be extended into a double chest.");
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -361,7 +397,7 @@ public final class PropertySignListener implements Listener {
             event.setCancelled(true);
             GardenMessages.send(event.getPlayer(),
                     "This chest is the registered mailbox for " + mailboxProperty.display()
-                            + ". Delete the property before removing its mailbox chest.");
+                            + ". Delete the property before removing its mailbox container.");
             return;
         }
 
@@ -389,6 +425,154 @@ public final class PropertySignListener implements Listener {
         if (properties.signAt(PropertyBlockPosition.from(event.getBlock().getLocation())).isPresent()) {
             event.setCancelled(true);
         }
+    }
+
+    private boolean tryHandleSimpleApartmentSign(
+            SignChangeEvent event,
+            Player player,
+            Block signBlock
+    ) throws SQLException {
+        String unit = safe(event.getLine(0));
+        if (unit.isBlank()
+                || !safe(event.getLine(1)).isBlank()
+                || !safe(event.getLine(2)).isBlank()
+                || !safe(event.getLine(3)).isBlank()) {
+            return false;
+        }
+
+        Block support = attachedSupport(signBlock);
+        boolean mailboxContainer = support != null && ContainerKey.supported(support);
+
+        if (mailboxContainer) {
+            LandClaimRecord locationClaim = claims.findAt(support).orElse(null);
+            if (locationClaim == null) {
+                return false;
+            }
+            PropertyAddress building = ancestorAddress(locationClaim);
+            if (building == null) {
+                return false;
+            }
+            PropertyAddress apartment = properties
+                    .findByDisplayAddress(building.road(), building.number() + " " + unit)
+                    .orElse(null);
+            if (apartment == null) {
+                return false;
+            }
+            LandClaimRecord apartmentClaim = claims.find(apartment.claimId()).orElse(null);
+            if (apartmentClaim == null || !isType(apartmentClaim, "APARTMENT")) {
+                return false;
+            }
+            if (!canManage(player, apartmentClaim)) {
+                GardenMessages.send(player, "You do not manage this apartment.");
+                return true;
+            }
+            if (!ContainerKey.single(support)) {
+                GardenMessages.send(player,
+                        "Apartment mailboxes must be a single chest, copper chest, or barrel.");
+                return true;
+            }
+            if (!mailboxAllowedForApartment(support, apartmentClaim)) {
+                GardenMessages.send(player,
+                        "The apartment mailbox must be inside the apartment or one of its parent building claims.");
+                return true;
+            }
+
+            PropertyAddress mailboxOwner = properties
+                    .propertyForMailbox(PropertyBlockPosition.from(support.getLocation()))
+                    .orElse(null);
+            if (mailboxOwner != null && !mailboxOwner.propertyId().equals(apartment.propertyId())) {
+                GardenMessages.send(player,
+                        "That container is already the mailbox for " + mailboxOwner.display() + ".");
+                return true;
+            }
+
+            properties.bindSign(
+                    apartment.propertyId(),
+                    PropertyBlockPosition.from(signBlock.getLocation()),
+                    player.getUniqueId(),
+                    PropertySignKind.APARTMENT_MAILBOX
+            );
+            properties.setMailbox(
+                    apartment.propertyId(),
+                    PropertyBlockPosition.from(support.getLocation())
+            );
+            containers.noteMailbox(support, apartmentClaim.id());
+            applyEventText(event, apartment, apartmentClaim, PropertySignKind.APARTMENT_MAILBOX);
+
+            Bukkit.getScheduler().runTask(plugin, () ->
+                    GardenMessages.send(player,
+                            "Apartment mailbox linked: " + apartment.display() + "."));
+            return true;
+        }
+
+        LandClaimRecord apartmentClaim = claimTouchingSign(signBlock);
+        if (apartmentClaim == null || !isType(apartmentClaim, "APARTMENT")) {
+            return false;
+        }
+        if (!canManage(player, apartmentClaim)) {
+            GardenMessages.send(player, "You do not manage this apartment.");
+            return true;
+        }
+
+        PropertyAddress apartment = properties.findByClaim(apartmentClaim.id()).orElse(null);
+        boolean created = false;
+        if (apartment == null) {
+            PropertyAddress building = ancestorAddress(apartmentClaim);
+            if (building == null) {
+                GardenMessages.send(player,
+                        "Register the parent building/property address before setting up apartment " + unit + ".");
+                return true;
+            }
+            apartment = properties.register(
+                    apartmentClaim.id(),
+                    building.road(),
+                    building.number(),
+                    unit
+            );
+            created = true;
+        } else if (apartment.unitLabel() == null
+                || !apartment.unitLabel().equalsIgnoreCase(unit)) {
+            GardenMessages.send(player,
+                    "This apartment is already registered as " + apartment.display() + ".");
+            return true;
+        }
+
+        properties.bindSign(
+                apartment.propertyId(),
+                PropertyBlockPosition.from(signBlock.getLocation()),
+                player.getUniqueId(),
+                PropertySignKind.APARTMENT_UNIT
+        );
+        applyEventText(event, apartment, apartmentClaim, PropertySignKind.APARTMENT_UNIT);
+
+        PropertyAddress finalApartment = apartment;
+        boolean finalCreated = created;
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            GardenMessages.send(player,
+                    (finalCreated ? "Apartment registered: " : "Apartment room sign linked: ")
+                            + finalApartment.display() + ".");
+            if (!properties.apartmentSetupComplete(finalApartment.propertyId())) {
+                GardenMessages.send(player,
+                        "Now place a sign with only " + finalApartment.unitLabel()
+                                + " on a single chest, copper chest, or barrel in the building mail area.");
+            }
+        });
+        return true;
+    }
+
+    private PropertyAddress ancestorAddress(LandClaimRecord claim) {
+        LandClaimRecord current = claim;
+        java.util.HashSet<java.util.UUID> seen = new java.util.HashSet<>();
+        while (current != null && seen.add(current.id())) {
+            if (!isType(current, "APARTMENT")) {
+                PropertyAddress address = properties.findByClaim(current.id()).orElse(null);
+                if (address != null) {
+                    return address;
+                }
+            }
+            current = current.parentId() == null ? null : claims.find(current.parentId()).orElse(null);
+        }
+        return null;
     }
 
     private boolean protectFromDestruction(Block block) {
@@ -478,10 +662,17 @@ public final class PropertySignListener implements Listener {
             PropertySignKind kind
     ) {
         String owner = ownerDisplay(claim);
-        if (kind == PropertySignKind.APARTMENT_MAILBOX) {
+        if (kind == PropertySignKind.APARTMENT_UNIT) {
             event.setLine(0, property.unitLabel() == null ? property.number() : property.unitLabel());
-            event.setLine(1, property.forSale() ? "⟡ " + property.price() : owner);
+            event.setLine(1, "");
             event.setLine(2, "");
+            event.setLine(3, "");
+            return;
+        }
+        if (kind == PropertySignKind.APARTMENT_MAILBOX) {
+            event.setLine(0, property.road());
+            event.setLine(1, displayLineTwo(property));
+            event.setLine(2, owner);
             event.setLine(3, "");
             return;
         }

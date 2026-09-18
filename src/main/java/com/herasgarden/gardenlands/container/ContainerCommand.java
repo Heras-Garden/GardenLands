@@ -37,7 +37,7 @@ public final class ContainerCommand implements CommandExecutor, TabCompleter {
         }
         Block block = player.getTargetBlockExact(6);
         if (block == null || !ContainerKey.supported(block)) {
-            LandsMessages.send(player, "Look directly at a chest, trapped chest, or barrel first.");
+            LandsMessages.send(player, "Look directly at a chest, trapped chest, copper chest, or barrel first.");
             return true;
         }
 
@@ -51,7 +51,22 @@ public final class ContainerCommand implements CommandExecutor, TabCompleter {
             }
             if (args[0].equalsIgnoreCase("reset")) {
                 permissions.reset(player, block);
-                LandsMessages.send(player, "This container now uses the claim defaults.");
+                LandsMessages.send(player, "This container now uses the claim defaults and allows mob access.");
+                show(player, block);
+                return true;
+            }
+            if ((args[0].equalsIgnoreCase("mobs") || args[0].equalsIgnoreCase("golems"))) {
+                boolean allowed;
+                if (args.length < 2 || args[1].equalsIgnoreCase("toggle")) {
+                    allowed = !permissions.mobAccessAllowed(block);
+                } else if (args[1].equalsIgnoreCase("allow") || args[1].equalsIgnoreCase("on")) {
+                    allowed = true;
+                } else if (args[1].equalsIgnoreCase("deny") || args[1].equalsIgnoreCase("off")) {
+                    allowed = false;
+                } else {
+                    throw new IllegalArgumentException("Use /chest mobs <allow|deny|toggle>.");
+                }
+                permissions.setMobAccess(player, block, allowed);
                 show(player, block);
                 return true;
             }
@@ -70,7 +85,7 @@ public final class ContainerCommand implements CommandExecutor, TabCompleter {
                 show(player, block);
                 return true;
             }
-            LandsMessages.send(player, "Usage: /chest [reset|cycle <open|insert|take|break>|set <action> <inherit|allow|deny>]");
+            LandsMessages.send(player, "Usage: /chest [reset|mobs <allow|deny|toggle>|cycle <open|insert|take|break>|set <action> <inherit|allow|deny>]");
         } catch (IllegalArgumentException exception) {
             LandsMessages.send(player, exception.getMessage());
         } catch (SQLException exception) {
@@ -118,6 +133,11 @@ public final class ContainerCommand implements CommandExecutor, TabCompleter {
         line(player, "Insert", ContainerAccessAction.INSERT, value.insert());
         line(player, "Take", ContainerAccessAction.TAKE, value.take());
         line(player, "Break", ContainerAccessAction.BREAK, value.breakAccess());
+        boolean mobs = permissions.mobAccessAllowed(block);
+        player.sendMessage(Component.text("Mobs/Golems: ", NamedTextColor.WHITE)
+                .append(Component.text(mobs ? "[ALLOW]" : "[DENY]", mobs ? NamedTextColor.GREEN : NamedTextColor.RED)
+                        .clickEvent(ClickEvent.runCommand("/chest mobs toggle"))
+                        .hoverEvent(HoverEvent.showText(Component.text("Allow or deny copper golems and other item-transporting mobs.")))));
         player.sendMessage(Component.text("[Reset to Claim Defaults]", NamedTextColor.GRAY)
                 .clickEvent(ClickEvent.runCommand("/chest reset"))
                 .hoverEvent(HoverEvent.showText(Component.text("Remove every override on this container."))));
@@ -165,8 +185,13 @@ public final class ContainerCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return List.of("reset", "cycle", "set").stream()
+            return List.of("reset", "mobs", "golems", "cycle", "set").stream()
                     .filter(value -> value.startsWith(args[0].toLowerCase(Locale.ROOT)))
+                    .toList();
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("mobs") || args[0].equalsIgnoreCase("golems"))) {
+            return List.of("allow", "deny", "toggle").stream()
+                    .filter(value -> value.startsWith(args[1].toLowerCase(Locale.ROOT)))
                     .toList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("cycle") || args[0].equalsIgnoreCase("set"))) {

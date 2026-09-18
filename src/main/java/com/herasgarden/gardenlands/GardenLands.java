@@ -25,6 +25,7 @@ import com.herasgarden.gardenlands.claim.ClaimOutlineCommand;
 import com.herasgarden.gardenlands.claim.LandsAccessService;
 import com.herasgarden.gardenlands.container.ContainerCleanupListener;
 import com.herasgarden.gardenlands.container.ContainerCommand;
+import com.herasgarden.gardenlands.container.ContainerMobAccessListener;
 import com.herasgarden.gardenlands.container.ContainerPermissionService;
 import com.herasgarden.gardenlands.door.DoorCleanupListener;
 import com.herasgarden.gardenlands.door.DoorCommand;
@@ -224,6 +225,7 @@ public final class GardenLands extends JavaPlugin {
                     this);
         }
         getServer().getPluginManager().registerEvents(new ContainerCleanupListener(containerPermissions), this);
+        getServer().getPluginManager().registerEvents(new ContainerMobAccessListener(containerPermissions), this);
         getServer().getPluginManager().registerEvents(new DoorCleanupListener(doorPermissions), this);
         AccessSettingsGui accessSettingsGui =
                 new AccessSettingsGui(claimDirectory, containerPermissions, doorPermissions);

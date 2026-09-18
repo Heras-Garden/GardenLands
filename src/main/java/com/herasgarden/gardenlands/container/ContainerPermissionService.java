@@ -26,6 +26,7 @@ public final class ContainerPermissionService implements ContainerAccessPolicy {
     private final GardenStorage storage;
     private final ClaimDirectory claims;
     private final Map<ContainerKey, ContainerOverride> overrides = new ConcurrentHashMap<>();
+    private final Map<ContainerKey, Boolean> mobAccess = new ConcurrentHashMap<>();
     private final Map<ContainerKey, UUID> mailboxClaims = new ConcurrentHashMap<>();
 
     public ContainerPermissionService(GardenStorage storage, ClaimDirectory claims) {
@@ -54,6 +55,19 @@ public final class ContainerPermissionService implements ContainerAccessPolicy {
                 loaded.put(key, value);
             }
         }
+        Map<ContainerKey, Boolean> loadedMobAccess = new ConcurrentHashMap<>();
+        try (Connection connection = storage.connection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT world_uuid, x, y, z, allowed FROM gl_container_mob_access");
+             ResultSet result = statement.executeQuery()) {
+            while (result.next()) {
+                loadedMobAccess.put(new ContainerKey(
+                                UUID.fromString(result.getString("world_uuid")),
+                                result.getInt("x"), result.getInt("y"), result.getInt("z")),
+                        result.getInt("allowed") != 0);
+            }
+        }
+
         Map<ContainerKey, UUID> loadedMailboxes = new ConcurrentHashMap<>();
         try (Connection connection = storage.connection();
              PreparedStatement statement = connection.prepareStatement(
@@ -71,6 +85,8 @@ public final class ContainerPermissionService implements ContainerAccessPolicy {
 
         overrides.clear();
         overrides.putAll(loaded);
+        mobAccess.clear();
+        mobAccess.putAll(loadedMobAccess);
         mailboxClaims.clear();
         mailboxClaims.putAll(loadedMailboxes);
     }
@@ -116,6 +132,66 @@ public final class ContainerPermissionService implements ContainerAccessPolicy {
         return Optional.empty();
     }
 
+    public boolean mobAccessAllowed(Block block) {
+        if (!ContainerKey.supported(block)) {
+            return true;
+        }
+        if (isMailbox(block)) {
+            return false;
+        }
+        return mobAccess.getOrDefault(ContainerKey.of(block), true);
+    }
+
+    public void setMobAccess(Player editor, Block block, boolean allowed) throws SQLException {
+        if (!ContainerKey.supported(block)) {
+            throw new IllegalArgumentException("Look at a chest, trapped chest, copper chest, or barrel first.");
+        }
+        LandClaimRecord claim = claims.findAt(block)
+                .orElseThrow(() -> new IllegalArgumentException("That container is not inside a Garden claim."));
+        if (!claims.canManage(editor, claim)) {
+            throw new IllegalArgumentException("You do not manage this claim.");
+        }
+        if (isMailbox(block)) {
+            throw new IllegalArgumentException("Mailboxes never allow mob or copper-golem access.");
+        }
+
+        ContainerKey key = ContainerKey.of(block);
+        long now = System.currentTimeMillis();
+        try (Connection connection = storage.connection()) {
+            int changed;
+            try (PreparedStatement update = connection.prepareStatement(
+                    "UPDATE gl_container_mob_access SET claim_uuid = ?, allowed = ?, updated_by = ?, updated_at = ? "
+                            + "WHERE world_uuid = ? AND x = ? AND y = ? AND z = ?")) {
+                update.setString(1, claim.id().toString());
+                update.setInt(2, allowed ? 1 : 0);
+                update.setString(3, editor.getUniqueId().toString());
+                update.setLong(4, now);
+                update.setString(5, key.worldId().toString());
+                update.setInt(6, key.x());
+                update.setInt(7, key.y());
+                update.setInt(8, key.z());
+                changed = update.executeUpdate();
+            }
+            if (changed == 0) {
+                try (PreparedStatement insert = connection.prepareStatement(
+                        "INSERT INTO gl_container_mob_access "
+                                + "(world_uuid, x, y, z, claim_uuid, allowed, updated_by, updated_at) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                    insert.setString(1, key.worldId().toString());
+                    insert.setInt(2, key.x());
+                    insert.setInt(3, key.y());
+                    insert.setInt(4, key.z());
+                    insert.setString(5, claim.id().toString());
+                    insert.setInt(6, allowed ? 1 : 0);
+                    insert.setString(7, editor.getUniqueId().toString());
+                    insert.setLong(8, now);
+                    insert.executeUpdate();
+                }
+            }
+        }
+        mobAccess.put(key, allowed);
+    }
+
     public ContainerOverride effectiveRecord(Block block) {
         LandClaimRecord claim = claims.findAt(block)
                 .orElseThrow(() -> new IllegalArgumentException("That container is not inside a Garden claim."));
@@ -126,7 +202,7 @@ public final class ContainerPermissionService implements ContainerAccessPolicy {
     public ContainerOverride set(Player editor, Block block, ContainerAccessAction action, AccessDecision value)
             throws SQLException {
         if (!ContainerKey.supported(block)) {
-            throw new IllegalArgumentException("Look at a chest, trapped chest, or barrel first.");
+            throw new IllegalArgumentException("Look at a chest, trapped chest, copper chest, or barrel first.");
         }
         LandClaimRecord claim = claims.findAt(block)
                 .orElseThrow(() -> new IllegalArgumentException("That container is not inside a Garden claim."));
@@ -150,7 +226,7 @@ public final class ContainerPermissionService implements ContainerAccessPolicy {
 
     public void reset(Player editor, Block block) throws SQLException {
         if (!ContainerKey.supported(block)) {
-            throw new IllegalArgumentException("Look at a chest, trapped chest, or barrel first.");
+            throw new IllegalArgumentException("Look at a chest, trapped chest, copper chest, or barrel first.");
         }
         LandClaimRecord claim = claims.findAt(block)
                 .orElseThrow(() -> new IllegalArgumentException("That container is not inside a Garden claim."));
@@ -168,16 +244,26 @@ public final class ContainerPermissionService implements ContainerAccessPolicy {
             return;
         }
         ContainerKey key = ContainerKey.of(block);
-        try (Connection connection = storage.connection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "DELETE FROM gl_container_permissions WHERE world_uuid = ? AND x = ? AND y = ? AND z = ?")) {
-            statement.setString(1, key.worldId().toString());
-            statement.setInt(2, key.x());
-            statement.setInt(3, key.y());
-            statement.setInt(4, key.z());
-            statement.executeUpdate();
+        try (Connection connection = storage.connection()) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM gl_container_permissions WHERE world_uuid = ? AND x = ? AND y = ? AND z = ?")) {
+                statement.setString(1, key.worldId().toString());
+                statement.setInt(2, key.x());
+                statement.setInt(3, key.y());
+                statement.setInt(4, key.z());
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM gl_container_mob_access WHERE world_uuid = ? AND x = ? AND y = ? AND z = ?")) {
+                statement.setString(1, key.worldId().toString());
+                statement.setInt(2, key.x());
+                statement.setInt(3, key.y());
+                statement.setInt(4, key.z());
+                statement.executeUpdate();
+            }
         }
         overrides.remove(key);
+        mobAccess.remove(key);
     }
 
     @Override

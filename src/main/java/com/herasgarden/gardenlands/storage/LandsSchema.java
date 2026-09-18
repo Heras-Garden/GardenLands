@@ -39,6 +39,17 @@ public final class LandsSchema {
                     + "updated_at BIGINT NOT NULL,"
                     + "PRIMARY KEY (world_uuid, x, y, z))");
 
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS gl_container_mob_access ("
+                    + "world_uuid VARCHAR(36) NOT NULL,"
+                    + "x INTEGER NOT NULL,"
+                    + "y INTEGER NOT NULL,"
+                    + "z INTEGER NOT NULL,"
+                    + "claim_uuid VARCHAR(36) NOT NULL,"
+                    + "allowed INTEGER NOT NULL DEFAULT 1,"
+                    + "updated_by VARCHAR(36) NOT NULL,"
+                    + "updated_at BIGINT NOT NULL,"
+                    + "PRIMARY KEY (world_uuid, x, y, z))");
+
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS gl_door_permissions ("
                     + "world_uuid VARCHAR(36) NOT NULL,"
                     + "x INTEGER NOT NULL,"

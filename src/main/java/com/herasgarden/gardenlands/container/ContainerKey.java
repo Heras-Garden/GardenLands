@@ -12,8 +12,19 @@ import java.util.UUID;
 
 public record ContainerKey(UUID worldId, int x, int y, int z) {
     public static boolean supported(Block block) {
+        if (block == null) {
+            return false;
+        }
         Material type = block.getType();
-        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL;
+        String name = type.name();
+        return type == Material.CHEST
+                || type == Material.TRAPPED_CHEST
+                || type == Material.BARREL
+                || name.endsWith("COPPER_CHEST");
+    }
+
+    public static boolean single(Block block) {
+        return supported(block) && members(block).size() == 1;
     }
 
     public static ContainerKey of(Block block) {
@@ -55,13 +66,5 @@ public record ContainerKey(UUID worldId, int x, int y, int z) {
 
     private static ContainerKey direct(Block block) {
         return new ContainerKey(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
-    }
-
-    private static int compare(Block a, Block b) {
-        int x = Integer.compare(a.getX(), b.getX());
-        if (x != 0) return x;
-        int y = Integer.compare(a.getY(), b.getY());
-        if (y != 0) return y;
-        return Integer.compare(a.getZ(), b.getZ());
     }
 }
