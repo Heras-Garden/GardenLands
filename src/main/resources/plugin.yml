@@ -1,0 +1,72 @@
+name: GardenLands
+version: '${project.version}'
+main: com.herasgarden.gardenlands.GardenLands
+api-version: '26.2'
+author: Hera's Garden
+website: https://herasgarden.net
+description: Land, housing, property, territory, and citizenship systems for The Garden SMP.
+depend: [GardenCore]
+softdepend: [BlueMap, GardenCosmetics]
+
+commands:
+  citizen:
+    description: Choose and view your territory affiliation.
+    usage: /citizen <status|join|leave|list>
+  territory:
+    description: Garden territory commands.
+    usage: /territory <list|info>
+  chest:
+    description: Edit the per-container permissions for the chest or barrel you are looking at.
+    usage: /chest [reset|cycle <open|insert|take|break>|set <action> <inherit|allow|deny>]
+  door:
+    description: Edit the per-door permissions for the door or trapdoor you are looking at.
+    usage: /door [reset|cycle <use|break>|set <action> <inherit|allow|deny>]
+  land:
+    description: Send and manage voluntary offers to buy independent property claims.
+    usage: /land <offer <amount>|offers|accept <id>|decline <id>>
+  outline:
+    aliases: [claimoutline]
+    description: Show a private particle outline for a claim or territory.
+    usage: /outline <here|claim <id>|territory <name>|off>
+  property:
+    description: Register, edit, list, buy, sell, and manage GardenLands properties.
+    usage: /property <register|registerunit|sell|market|edit|delete|mailbox|info|list|buy|cancel>
+  rent:
+    description: List, inspect, and rent Garden properties.
+    usage: /rent <info|list <price> <duration>|nightly <price> [max-nights]|accept|book <nights>|cancel|status>
+
+permissions:
+  gardenlands.citizen:
+    default: true
+  gardenlands.citizen.list:
+    default: true
+  gardenlands.territory.view:
+    default: true
+  gardenlands.container.manage:
+    default: true
+  gardenlands.mailbox.mailman:
+    description: Access registered property mailboxes for mail delivery.
+    default: false
+  gardenlands.door.manage:
+    default: true
+  gardenlands.land.offer:
+    default: true
+  gardenlands.outline:
+    default: true
+  gardenlands.property:
+    description: Use GardenLands property commands.
+    default: true
+  gardenlands.property.admin:
+    description: List and manage all GardenLands properties.
+    default: op
+  gardenlands.rent:
+    description: Rent an available Garden property.
+    default: true
+  gardenlands.rent.list:
+    description: List a directly owned Garden property for rent.
+    default: true
+  gardenlands.claim.admin:
+    default: op
+  gardenlands.chat.admin-color:
+    description: Use the configured Garden staff chat name color.
+    default: op

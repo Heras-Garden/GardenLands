@@ -1,0 +1,33 @@
+chat:
+  enabled: true
+  player-heads: true
+  territory-flags: true
+  separator: ">>"
+  default-name-color: "#E7E3E5"
+  admin-name-color: "#A78BFA"
+  owner-name: "heraclidmc"
+  owner-name-color: "#F472B6"
+  donor-tag-color: "#D4AF37"
+  # Turn this on only after the generated patterned-flag font has been
+  # installed in the server resource pack. Until then a vanilla banner sprite
+  # is used so the badge never renders as a missing glyph.
+  use-generated-flag-font: false
+
+territories:
+  # Keeps the async chat renderer database-free while still picking up newly
+  # created territories and changed flags without a restart.
+  cache-refresh-ticks: 200
+
+container-permissions:
+  enabled: true
+
+bluemap:
+  enabled: true
+  territory-layer-label: "Territories"
+  territory-shape-y: 64
+  property-layer-label: "Properties for Sale"
+  city-layer-label: "Cities"
+  district-layer-label: "Districts"
+  property-marker-y: 70
+  administrative-marker-y: 72
+  refresh-ticks: 1200
