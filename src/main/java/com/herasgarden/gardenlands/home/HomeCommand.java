@@ -76,7 +76,7 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
                     .filter(home -> matches(home.address(), query))
                     .toList();
             if (matches.isEmpty()) {
-                LandsMessages.send(player, "No owned home matches "" + query + "". Use /home to choose an address.");
+                LandsMessages.send(player, "No owned home matches \"" + query + "\". Use /home to choose an address.");
                 return true;
             }
             if (matches.size() > 1) {
