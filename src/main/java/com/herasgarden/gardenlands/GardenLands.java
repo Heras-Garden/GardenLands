@@ -32,6 +32,7 @@ import com.herasgarden.gardenlands.door.DoorCommand;
 import com.herasgarden.gardenlands.door.DoorPermissionService;
 import com.herasgarden.gardenlands.interaction.AccessSettingsGui;
 import com.herasgarden.gardenlands.interaction.AccessSettingsListener;
+import com.herasgarden.gardenlands.home.HomeCommand;
 import com.herasgarden.gardenlands.property.LandsPropertyDirectory;
 import com.herasgarden.gardenlands.property.PropertyCommand;
 import com.herasgarden.gardenlands.property.PropertySignListener;
@@ -190,6 +191,13 @@ public final class GardenLands extends JavaPlugin {
         if (property != null) {
             property.setExecutor(propertyCommand);
             property.setTabCompleter(propertyCommand);
+        }
+
+        HomeCommand homeCommand = new HomeCommand(propertyDirectory, claimDirectory);
+        PluginCommand home = getCommand("home");
+        if (home != null) {
+            home.setExecutor(homeCommand);
+            home.setTabCompleter(homeCommand);
         }
 
         RentalCommand rentalCommand = new RentalCommand(
