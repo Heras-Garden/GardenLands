@@ -24,6 +24,9 @@ commands:
   land:
     description: Send and manage voluntary offers to buy independent property claims.
     usage: /land <offer <amount>|offers|accept <id>|decline <id>>
+  home:
+    description: Teleport to one of your owned addressed homes.
+    usage: /home [address|list]
   outline:
     aliases: [claimoutline]
     description: Show a private particle outline for a claim or territory.
@@ -50,6 +53,9 @@ permissions:
   gardenlands.door.manage:
     default: true
   gardenlands.land.offer:
+    default: true
+  gardenlands.home:
+    description: Teleport to owned addressed homes.
     default: true
   gardenlands.outline:
     default: true
