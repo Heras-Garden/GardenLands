@@ -115,16 +115,16 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        World world = Bukkit.getWorld(home.worldId());
+        World world = Bukkit.getWorld(claim.worldId());
         if (world == null) world = Bukkit.getWorld(home.worldName());
         if (world == null) {
             LandsMessages.send(player, "That home's world is unavailable.");
             return;
         }
 
-        Location destination = safeLocation(world, home, claim);
+        Location destination = safeLocation(world, claim);
         if (destination == null) {
-            LandsMessages.send(player, "No safe teleport spot could be found near " + home.address() + ".");
+            LandsMessages.send(player, "No safe teleport spot could be found inside " + home.address() + ".");
             return;
         }
 
@@ -137,26 +137,41 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    private Location safeLocation(World world, PropertyMailbox home, LandClaimRecord claim) {
-        int[][] offsets = {
-                {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-                {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-                {2, 0}, {-2, 0}, {0, 2}, {0, -2},
-                {2, 1}, {2, -1}, {-2, 1}, {-2, -1},
-                {1, 2}, {-1, 2}, {1, -2}, {-1, -2},
-                {2, 2}, {2, -2}, {-2, 2}, {-2, -2}
-        };
+    private Location safeLocation(World world, LandClaimRecord claim) {
+        if (claim.vertices().isEmpty()) return null;
 
-        for (int[] offset : offsets) {
-            int x = home.x() + offset[0];
-            int z = home.z() + offset[1];
-            for (int y = home.y() + 2; y >= home.y() - 2; y--) {
-                if (!claim.contains(x, y, z)) continue;
-                Block feet = world.getBlockAt(x, y, z);
-                Block head = world.getBlockAt(x, y + 1, z);
-                Block floor = world.getBlockAt(x, y - 1, z);
-                if (safe(feet, head, floor)) {
-                    return new Location(world, x + 0.5, y, z + 0.5);
+        int minX = claim.vertices().stream().mapToInt(LandClaimRecord.Point::x).min().orElse(0);
+        int maxX = claim.vertices().stream().mapToInt(LandClaimRecord.Point::x).max().orElse(0);
+        int minZ = claim.vertices().stream().mapToInt(LandClaimRecord.Point::z).min().orElse(0);
+        int maxZ = claim.vertices().stream().mapToInt(LandClaimRecord.Point::z).max().orElse(0);
+        int centerX = (minX + maxX) / 2;
+        int centerZ = (minZ + maxZ) / 2;
+        int maxRadius = Math.max(4, Math.min(24, Math.max(maxX - minX, maxZ - minZ)));
+
+        for (int radius = 0; radius <= maxRadius; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (radius > 0 && Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
+                    int x = centerX + dx;
+                    int z = centerZ + dz;
+                    if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+
+                    if (claim.fullHeight()) {
+                        int y = Math.min(world.getMaxHeight() - 2, world.getHighestBlockYAt(x, z) + 1);
+                        if (!claim.contains(x, y, z)) continue;
+                        Block feet = world.getBlockAt(x, y, z);
+                        Block head = world.getBlockAt(x, y + 1, z);
+                        Block floor = world.getBlockAt(x, y - 1, z);
+                        if (safe(feet, head, floor)) return new Location(world, x + 0.5, y, z + 0.5);
+                    } else {
+                        for (int y = claim.minY() + 1; y < claim.maxY(); y++) {
+                            if (!claim.contains(x, y, z)) continue;
+                            Block feet = world.getBlockAt(x, y, z);
+                            Block head = world.getBlockAt(x, y + 1, z);
+                            Block floor = world.getBlockAt(x, y - 1, z);
+                            if (safe(feet, head, floor)) return new Location(world, x + 0.5, y, z + 0.5);
+                        }
+                    }
                 }
             }
         }

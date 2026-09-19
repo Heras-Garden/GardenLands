@@ -778,7 +778,18 @@ public final class PropertySignListener implements Listener {
     }
 
     private boolean isType(LandClaimRecord claim, String type) {
-        return claim != null && type.equalsIgnoreCase(claim.type());
+        if (claim == null || type == null) return false;
+        if ("APARTMENT".equalsIgnoreCase(type)) {
+            return claim.is("UNIT") && claim.tagged("APARTMENT");
+        }
+        if ("HOTEL_ROOM".equalsIgnoreCase(type)) {
+            return claim.is("UNIT") && claim.tagged("HOTEL_ROOM");
+        }
+        if ("BUILDING".equalsIgnoreCase(type)) {
+            return claim.is("PROPERTY") && (claim.tagged("BUILDING") || claim.tagged("APARTMENT_BUILDING")
+                    || claim.tagged("HOTEL"));
+        }
+        return type.equalsIgnoreCase(claim.type());
     }
 
     private String displayLineTwo(PropertyAddress property) {
