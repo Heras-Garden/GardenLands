@@ -2,6 +2,9 @@ package com.herasgarden.gardenlands.home;
 
 import com.herasgarden.gardencore.api.land.PropertyDirectory;
 import com.herasgarden.gardencore.api.land.PropertyMailbox;
+import com.herasgarden.gardencore.api.land.PropertyManagementService;
+import com.herasgarden.gardencore.api.land.PropertySignBinding;
+import com.herasgarden.gardencore.api.land.PropertySignKind;
 import com.herasgarden.gardenlands.claim.ClaimDirectory;
 import com.herasgarden.gardenlands.claim.LandClaimRecord;
 import com.herasgarden.gardenlands.ui.LandsMessages;
@@ -14,12 +17,15 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.Sign;
+import org.bukkit.block.data.Directional;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.util.Vector;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -29,10 +35,16 @@ import java.util.Locale;
 
 public final class HomeCommand implements CommandExecutor, TabCompleter {
     private final PropertyDirectory properties;
+    private final PropertyManagementService propertyManagement;
     private final ClaimDirectory claims;
 
-    public HomeCommand(PropertyDirectory properties, ClaimDirectory claims) {
+    public HomeCommand(
+            PropertyDirectory properties,
+            PropertyManagementService propertyManagement,
+            ClaimDirectory claims
+    ) {
         this.properties = properties;
+        this.propertyManagement = propertyManagement;
         this.claims = claims;
     }
 
@@ -122,19 +134,69 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        Location destination = safeLocation(world, claim);
+        Location destination = mailboxSignDestination(world, home);
+        if (destination == null) destination = safeLocation(world, claim);
         if (destination == null) {
-            LandsMessages.send(player, "No safe teleport spot could be found inside " + home.address() + ".");
+            LandsMessages.send(player, "No safe teleport spot could be found at the mailbox for " + home.address() + ".");
             return;
         }
-
-        destination.setYaw(player.getLocation().getYaw());
-        destination.setPitch(player.getLocation().getPitch());
         if (player.teleport(destination, PlayerTeleportEvent.TeleportCause.COMMAND)) {
             LandsMessages.send(player, "Welcome home: " + home.address() + ".");
         } else {
             LandsMessages.send(player, "Home teleport was blocked.");
         }
+    }
+
+    private Location mailboxSignDestination(World world, PropertyMailbox home) {
+        PropertySignKind wanted = isApartment(home)
+                ? PropertySignKind.APARTMENT_MAILBOX
+                : PropertySignKind.PROPERTY_MAILBOX;
+        PropertySignBinding binding = propertyManagement.signsFor(home.propertyId()).stream()
+                .filter(value -> value.kind() == wanted)
+                .findFirst()
+                .orElse(null);
+        if (binding == null || !binding.position().worldId().equals(world.getUID())) return null;
+
+        Block signBlock = world.getBlockAt(
+                binding.position().x(),
+                binding.position().y(),
+                binding.position().z());
+        if (!(signBlock.getState() instanceof Sign)) return null;
+
+        org.bukkit.block.BlockFace facing = signBlock.getBlockData() instanceof Directional directional
+                ? directional.getFacing() : org.bukkit.block.BlockFace.NORTH;
+        Block front = signBlock.getRelative(facing);
+        Location safe = safeNear(front, signBlock);
+        if (safe != null) return safe;
+
+        return safeNear(signBlock, signBlock);
+    }
+
+    private boolean isApartment(PropertyMailbox home) {
+        LandClaimRecord claim = claims.find(home.claimId()).orElse(null);
+        return claim != null && claim.is("UNIT") && claim.tagged("APARTMENT");
+    }
+
+    private Location safeNear(Block center, Block faceToward) {
+        World world = center.getWorld();
+        for (int radius = 0; radius <= 2; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (radius > 0 && Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
+                    Block feet = world.getBlockAt(center.getX() + dx, center.getY(), center.getZ() + dz);
+                    Block head = feet.getRelative(org.bukkit.block.BlockFace.UP);
+                    Block floor = feet.getRelative(org.bukkit.block.BlockFace.DOWN);
+                    if (!safe(feet, head, floor)) continue;
+
+                    Location destination = feet.getLocation().add(0.5, 0.0, 0.5);
+                    Vector look = faceToward.getLocation().add(0.5, 0.5, 0.5).toVector()
+                            .subtract(destination.toVector());
+                    if (look.lengthSquared() > 0.0001D) destination.setDirection(look);
+                    return destination;
+                }
+            }
+        }
+        return null;
     }
 
     private Location safeLocation(World world, LandClaimRecord claim) {

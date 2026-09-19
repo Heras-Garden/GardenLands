@@ -193,7 +193,7 @@ public final class GardenLands extends JavaPlugin {
             property.setTabCompleter(propertyCommand);
         }
 
-        HomeCommand homeCommand = new HomeCommand(propertyDirectory, claimDirectory);
+        HomeCommand homeCommand = new HomeCommand(propertyDirectory, propertyManagement, claimDirectory);
         PluginCommand home = getCommand("home");
         if (home != null) {
             home.setExecutor(homeCommand);
