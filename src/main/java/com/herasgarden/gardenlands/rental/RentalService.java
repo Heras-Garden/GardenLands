@@ -79,14 +79,14 @@ public final class RentalService implements ClaimAccessPolicy, ClaimTransferPoli
             long nightlyPrice,
             int maxNights
     ) throws SQLException {
-        if (claim == null || !"HOTEL_ROOM".equalsIgnoreCase(claim.type())) {
+        if (!isHotelRoom(claim)) {
             throw new IllegalArgumentException(
-                    "Nightly listings are only available for HOTEL_ROOM claims.");
+                    "Nightly listings are only available for UNIT claims tagged HOTEL_ROOM.");
         }
-        if (maxNights < 1 || maxNights > 30) {
-            throw new IllegalArgumentException("Maximum hotel stay must be between 1 and 30 nights.");
+        if (maxNights != 1) {
+            throw new IllegalArgumentException("Hotel rooms are booked one night at a time.");
         }
-        return createListing(owner, claim, nightlyPrice, 24L * 60L, "NIGHTLY", maxNights);
+        return createListing(owner, claim, nightlyPrice, 20L, "NIGHTLY", 1);
     }
 
     private RentalRecord createListing(
@@ -110,11 +110,13 @@ public final class RentalService implements ClaimAccessPolicy, ClaimTransferPoli
             throw new IllegalArgumentException("Rental duration must be between 10 minutes and 30 days.");
         }
 
-        PropertyAddress property = properties.findByClaim(claim.id())
+        boolean hotelRoom = isHotelRoom(claim);
+        PropertyAddress property = hotelRoom ? null : properties.findByClaim(claim.id())
                 .orElseThrow(() -> new IllegalArgumentException("This claim is not a registered Garden property."));
-        if (property.forSale()) {
+        if (property != null && property.forSale()) {
             throw new IllegalArgumentException("Take this property off the sale market before listing it for rent.");
         }
+        UUID rentalPropertyId = hotelRoom ? claim.id() : property.propertyId();
 
         RentalRecord existing = openByClaim.get(claim.id());
         if (existing != null) {
@@ -125,7 +127,7 @@ public final class RentalService implements ClaimAccessPolicy, ClaimTransferPoli
 
         long now = System.currentTimeMillis();
         RentalRecord record = new RentalRecord(
-                UUID.randomUUID(), property.propertyId(), claim.id(), owner.getUniqueId(), null,
+                UUID.randomUUID(), rentalPropertyId, claim.id(), owner.getUniqueId(), null,
                 price, durationMinutes, null, "LISTED", now, null, null, now
         );
 
@@ -229,9 +231,10 @@ public final class RentalService implements ClaimAccessPolicy, ClaimTransferPoli
             cancelStale(listing);
             throw new IllegalArgumentException("The property owner changed before the rental could begin.");
         }
-        PropertyAddress property = properties.findByClaim(claim.id())
+        boolean hotelRoom = isHotelRoom(current);
+        PropertyAddress property = hotelRoom ? null : properties.findByClaim(claim.id())
                 .orElseThrow(() -> new IllegalArgumentException("This claim is no longer a registered Garden property."));
-        if (property.forSale()) {
+        if (property != null && property.forSale()) {
             throw new IllegalArgumentException("This property is currently for sale and cannot be rented.");
         }
 
@@ -471,6 +474,10 @@ public final class RentalService implements ClaimAccessPolicy, ClaimTransferPoli
                 expires == null ? null : result.getLong("expires_at"),
                 result.getLong("updated_at")
         );
+    }
+
+    private boolean isHotelRoom(LandClaimRecord claim) {
+        return claim != null && claim.is("UNIT") && claim.tagged("HOTEL_ROOM");
     }
 
     public record RentalTerms(

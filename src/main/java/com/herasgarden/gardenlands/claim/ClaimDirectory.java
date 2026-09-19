@@ -32,7 +32,7 @@ public final class ClaimDirectory {
         Map<UUID, MutableClaim> mutable = new HashMap<>();
         try (Connection connection = storage.connection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT claim_uuid, claim_type, name, owner_type, owner_uuid, parent_uuid, world_uuid, min_y, max_y, full_height "
+                     "SELECT claim_uuid, claim_type, claim_tag, name, owner_type, owner_uuid, parent_uuid, world_uuid, min_y, max_y, full_height "
                              + "FROM gc_claims");
              ResultSet result = statement.executeQuery()) {
             while (result.next()) {
@@ -40,6 +40,7 @@ public final class ClaimDirectory {
                 mutable.put(id, new MutableClaim(
                         id,
                         result.getString("claim_type"),
+                        result.getString("claim_tag"),
                         result.getString("name"),
                         result.getString("owner_type"),
                         UUID.fromString(result.getString("owner_uuid")),
@@ -150,6 +151,7 @@ public final class ClaimDirectory {
     private static final class MutableClaim {
         private final UUID id;
         private final String type;
+        private final String tag;
         private final String name;
         private final String ownerType;
         private final UUID ownerId;
@@ -160,10 +162,11 @@ public final class ClaimDirectory {
         private final boolean fullHeight;
         private final List<LandClaimRecord.Point> vertices = new ArrayList<>();
 
-        private MutableClaim(UUID id, String type, String name, String ownerType, UUID ownerId, UUID parentId,
+        private MutableClaim(UUID id, String type, String tag, String name, String ownerType, UUID ownerId, UUID parentId,
                              UUID worldId, int minY, int maxY, boolean fullHeight) {
             this.id = id;
             this.type = type;
+            this.tag = tag;
             this.name = name;
             this.ownerType = ownerType;
             this.ownerId = ownerId;
@@ -175,7 +178,7 @@ public final class ClaimDirectory {
         }
 
         private LandClaimRecord freeze() {
-            return new LandClaimRecord(id, type, name, ownerType, ownerId, parentId, worldId,
+            return new LandClaimRecord(id, type, tag, name, ownerType, ownerId, parentId, worldId,
                     minY, maxY, fullHeight, List.copyOf(vertices));
         }
     }

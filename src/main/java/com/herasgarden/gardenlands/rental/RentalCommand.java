@@ -47,8 +47,7 @@ public final class RentalCommand implements CommandExecutor, TabCompleter {
                 case "cancel" -> cancel(player);
                 case "status" -> status(player);
                 default -> LandsMessages.send(player,
-                        "Usage: /rent <info|list <price> <duration>|nightly <price> [max-nights]|"
-                                + "accept|book <nights>|cancel|status>");
+                        "Usage: /rent <info|list <price> <duration>|nightly <price>|accept|book|cancel|status>");
             }
         } catch (NumberFormatException exception) {
             LandsMessages.send(player, "Use a whole-number Obol price.");
@@ -84,17 +83,15 @@ public final class RentalCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length < 2) {
             LandsMessages.send(player,
-                    "Usage: /rent nightly <price-per-night> [max-nights], for example /rent nightly 12 7");
+                    "Usage: /rent nightly <price-per-night>, for example /rent nightly 12");
             return;
         }
 
         long nightlyPrice = Long.parseLong(args[1].replace(",", ""));
-        int maxNights = args.length >= 3 ? Integer.parseInt(args[2]) : 30;
         claims.refresh();
-        RentalRecord record = rentals.listNightly(
-                player, targetClaim(player), nightlyPrice, maxNights);
-        LandsMessages.send(player, "Property listed for " + symbol + " " + record.price()
-                + " per night, up to " + maxNights + (maxNights == 1 ? " night." : " nights."));
+        RentalRecord record = rentals.listNightly(player, targetClaim(player), nightlyPrice, 1);
+        LandsMessages.send(player, "Hotel room listed for " + symbol + " " + record.price()
+                + " for one Minecraft day (20 real-world minutes at normal tick rate).");
     }
 
     private void accept(Player player) throws SQLException {
@@ -118,24 +115,20 @@ public final class RentalCommand implements CommandExecutor, TabCompleter {
             LandsMessages.send(player, "You do not have permission to rent properties.");
             return;
         }
-        if (args.length < 2) {
-            LandsMessages.send(player, "Usage: /rent book <nights>.");
+        if (args.length >= 2 && !args[1].equals("1")) {
+            LandsMessages.send(player, "Hotel rooms are booked one night at a time.");
             return;
         }
 
-        int nights = Integer.parseInt(args[1]);
         claims.refresh();
-        RentalRecord record = rentals.book(player, targetClaim(player), nights);
-        LandsMessages.send(player, "Hotel rental active for " + nights
-                + (nights == 1 ? " night" : " nights")
-                + " until " + Instant.ofEpochMilli(record.expiresAt())
-                + ". Paid " + symbol + " " + record.price() + ".");
+        RentalRecord record = rentals.book(player, targetClaim(player), 1);
+        LandsMessages.send(player, "Hotel room booked for one Minecraft day, until "
+                + Instant.ofEpochMilli(record.expiresAt()) + ". Paid " + symbol + " " + record.price() + ".");
 
         Player owner = Bukkit.getPlayer(record.ownerId());
         if (owner != null) {
-            LandsMessages.send(owner, player.getName() + " booked your property for "
-                    + nights + (nights == 1 ? " night" : " nights")
-                    + " for " + symbol + " " + record.price() + ".");
+            LandsMessages.send(owner, player.getName() + " booked your hotel room for one Minecraft day for "
+                    + symbol + " " + record.price() + ".");
         }
     }
 
@@ -157,9 +150,7 @@ public final class RentalCommand implements CommandExecutor, TabCompleter {
             RentalService.RentalTerms terms = rentals.terms(record);
             if (terms.nightly()) {
                 LandsMessages.send(player, "Hotel rental: " + symbol + " " + terms.unitPrice()
-                        + " per night, up to " + terms.maxUnits()
-                        + (terms.maxUnits() == 1 ? " night." : " nights.")
-                        + " Use /rent book <nights>.");
+                        + " for one Minecraft day. Use /rent book.");
             } else {
                 LandsMessages.send(player, "For rent: " + symbol + " " + record.price()
                         + " for " + displayDuration(record.durationMinutes())
@@ -246,9 +237,7 @@ public final class RentalCommand implements CommandExecutor, TabCompleter {
         if (args.length == 3 && args[0].equalsIgnoreCase("list")) {
             return List.of("1h", "12h", "1d", "7d", "30d");
         }
-        if (args.length == 3 && args[0].equalsIgnoreCase("nightly")) {
-            return List.of("1", "3", "7", "14", "30");
-        }
+
         if (args.length == 2 && args[0].equalsIgnoreCase("book")) {
             return List.of("1", "2", "3", "7", "14");
         }

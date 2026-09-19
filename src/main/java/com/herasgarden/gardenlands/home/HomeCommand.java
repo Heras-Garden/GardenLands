@@ -49,6 +49,7 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
 
         try {
             List<PropertyMailbox> homes = new ArrayList<>(properties.mailboxesOwnedBy(player.getUniqueId()));
+            homes.removeIf(home -> !isHome(home));
             homes.sort(Comparator.comparing(PropertyMailbox::address, String.CASE_INSENSITIVE_ORDER));
 
             if (homes.isEmpty()) {
@@ -89,6 +90,11 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
             LandsMessages.send(player, "Your homes could not be loaded right now.");
         }
         return true;
+    }
+
+    private boolean isHome(PropertyMailbox home) {
+        LandClaimRecord claim = claims.find(home.claimId()).orElse(null);
+        return claim != null && (claim.is("HOME") || (claim.is("UNIT") && claim.tagged("APARTMENT")));
     }
 
     private void showPicker(Player player, List<PropertyMailbox> homes) {
@@ -187,6 +193,7 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
         if (!(sender instanceof Player player)) return List.of();
         try {
             List<String> addresses = properties.mailboxesOwnedBy(player.getUniqueId()).stream()
+                    .filter(this::isHome)
                     .map(PropertyMailbox::address)
                     .sorted(String.CASE_INSENSITIVE_ORDER)
                     .toList();

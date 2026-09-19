@@ -124,9 +124,15 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
 
         LandClaimRecord claim = currentClaim(player);
         requireManage(player, claim);
+        if (claim.is("UNIT") && claim.tagged("HOTEL_ROOM")) {
+            throw new IllegalArgumentException("Hotel rooms are temporary units and do not use registered addresses.");
+        }
+        if (claim.is("UNIT") && claim.tagged("APARTMENT") && !unitAddress) {
+            throw new IllegalArgumentException("Apartments require a unit address. Use /property registerunit <number> <unit> <road...>.");
+        }
         PropertyAddress property = management.register(claim.id(), road, number, unit);
         GardenMessages.send(player, "Registered " + property.display() + ".");
-        if ("APARTMENT".equalsIgnoreCase(claim.type())) {
+        if (claim.is("UNIT") && claim.tagged("APARTMENT")) {
             GardenMessages.send(player,
                     "Place the room sign on the apartment wall first, then place the matching mailbox sign on its mailbox chest.");
         } else {
@@ -284,7 +290,7 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
         PropertyAddress property = currentProperty(player);
         LandClaimRecord claim = requireClaim(property.claimId());
         requireManage(player, claim);
-        if ("APARTMENT".equalsIgnoreCase(claim.type())) {
+        if (claim.is("UNIT") && claim.tagged("APARTMENT")) {
             GardenMessages.send(player,
                     "Apartment mailboxes use a second matching property sign on the mailbox chest.");
         } else {
