@@ -448,9 +448,11 @@ public final class PropertySignListener implements Listener {
             if (locationClaim == null) {
                 return false;
             }
-            PropertyAddress building = ancestorAddress(locationClaim);
+            PropertyAddress building = buildingAddressNear(locationClaim, support);
             if (building == null) {
-                return false;
+                GardenMessages.send(player,
+                        "This mailbox is not inside a registered building/property address.");
+                return true;
             }
             PropertyAddress apartment = properties
                     .findByDisplayAddress(building.road(), building.number() + " " + unit)
@@ -505,8 +507,8 @@ public final class PropertySignListener implements Listener {
             return true;
         }
 
-        LandClaimRecord apartmentClaim = claimTouchingSign(signBlock);
-        if (apartmentClaim == null || !isType(apartmentClaim, "APARTMENT")) {
+        LandClaimRecord apartmentClaim = apartmentClaimNear(signBlock);
+        if (apartmentClaim == null) {
             return false;
         }
         if (!canManage(player, apartmentClaim)) {
@@ -517,10 +519,10 @@ public final class PropertySignListener implements Listener {
         PropertyAddress apartment = properties.findByClaim(apartmentClaim.id()).orElse(null);
         boolean created = false;
         if (apartment == null) {
-            PropertyAddress building = ancestorAddress(apartmentClaim);
+            PropertyAddress building = buildingAddressNear(apartmentClaim, signBlock);
             if (building == null) {
                 GardenMessages.send(player,
-                        "Register the parent building/property address before setting up apartment " + unit + ".");
+                        "Register the building/property address before setting up apartment " + unit + ".");
                 return true;
             }
             apartment = properties.register(
@@ -612,12 +614,51 @@ public final class PropertySignListener implements Listener {
     }
 
     private LandClaimRecord claimTouchingSign(Block signBlock) {
-        LandClaimRecord direct = claims.findAt(signBlock).orElse(null);
-        if (direct != null) {
-            return direct;
+        List<LandClaimRecord> nearby = nearbyClaims(signBlock);
+        return nearby.stream()
+                .min(java.util.Comparator.comparingDouble(LandClaimRecord::area))
+                .orElse(null);
+    }
+
+    private LandClaimRecord apartmentClaimNear(Block signBlock) {
+        return nearbyClaims(signBlock).stream()
+                .filter(claim -> isType(claim, "APARTMENT"))
+                .min(java.util.Comparator.comparingDouble(LandClaimRecord::area))
+                .orElse(null);
+    }
+
+    private List<LandClaimRecord> nearbyClaims(Block block) {
+        java.util.LinkedHashMap<java.util.UUID, LandClaimRecord> unique = new java.util.LinkedHashMap<>();
+        claims.findAllAt(block).forEach(claim -> unique.put(claim.id(), claim));
+
+        org.bukkit.block.BlockFace[] faces = {
+                org.bukkit.block.BlockFace.NORTH,
+                org.bukkit.block.BlockFace.SOUTH,
+                org.bukkit.block.BlockFace.EAST,
+                org.bukkit.block.BlockFace.WEST,
+                org.bukkit.block.BlockFace.UP,
+                org.bukkit.block.BlockFace.DOWN
+        };
+        for (org.bukkit.block.BlockFace face : faces) {
+            claims.findAllAt(block.getRelative(face))
+                    .forEach(claim -> unique.put(claim.id(), claim));
         }
-        Block support = attachedSupport(signBlock);
-        return support == null ? null : claims.findAt(support).orElse(null);
+        return List.copyOf(unique.values());
+    }
+
+    private PropertyAddress buildingAddressNear(LandClaimRecord claim, Block reference) {
+        PropertyAddress parentAddress = ancestorAddress(claim);
+        if (parentAddress != null) {
+            return parentAddress;
+        }
+
+        return nearbyClaims(reference).stream()
+                .filter(candidate -> !isType(candidate, "APARTMENT"))
+                .sorted(java.util.Comparator.comparingDouble(LandClaimRecord::area))
+                .map(candidate -> properties.findByClaim(candidate.id()).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean signTouchesClaim(Block signBlock, LandClaimRecord claim) {
@@ -630,7 +671,15 @@ public final class PropertySignListener implements Listener {
 
     private boolean mailboxAllowedForApartment(Block chest, LandClaimRecord apartmentClaim) {
         List<LandClaimRecord> atChest = claims.findAllAt(chest);
-        return atChest.stream().anyMatch(candidate -> claims.isSameOrAncestor(candidate, apartmentClaim));
+        if (atChest.stream().anyMatch(candidate -> claims.isSameOrAncestor(candidate, apartmentClaim))) {
+            return true;
+        }
+
+        PropertyAddress building = buildingAddressNear(apartmentClaim, chest);
+        if (building == null) {
+            return false;
+        }
+        return atChest.stream().anyMatch(candidate -> candidate.id().equals(building.claimId()));
     }
 
     private Block attachedSupport(Block signBlock) {
