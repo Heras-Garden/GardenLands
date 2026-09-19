@@ -1,6 +1,7 @@
 package com.herasgarden.gardenlands.home;
 
 import com.herasgarden.gardencore.api.land.PropertyDirectory;
+import com.herasgarden.gardencore.api.social.MarriageDirectory;
 import com.herasgarden.gardencore.api.land.PropertyMailbox;
 import com.herasgarden.gardencore.api.land.PropertyManagementService;
 import com.herasgarden.gardencore.api.land.PropertySignBinding;
@@ -25,6 +26,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.util.Vector;
 
 import java.sql.SQLException;
@@ -32,6 +34,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.UUID;
 
 public final class HomeCommand implements CommandExecutor, TabCompleter {
     private final PropertyDirectory properties;
@@ -60,7 +65,7 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
         }
 
         try {
-            List<PropertyMailbox> homes = new ArrayList<>(properties.mailboxesOwnedBy(player.getUniqueId()));
+            List<PropertyMailbox> homes = homesFor(player);
             homes.removeIf(home -> !isHome(home));
             homes.sort(Comparator.comparing(PropertyMailbox::address, String.CASE_INSENSITIVE_ORDER));
 
@@ -102,6 +107,26 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
             LandsMessages.send(player, "Your homes could not be loaded right now.");
         }
         return true;
+    }
+
+    private List<PropertyMailbox> homesFor(Player player) throws SQLException {
+        List<PropertyMailbox> homes = new ArrayList<>();
+        Set<UUID> owners = new LinkedHashSet<>();
+        owners.add(player.getUniqueId());
+
+        RegisteredServiceProvider<MarriageDirectory> registration =
+                Bukkit.getServicesManager().getRegistration(MarriageDirectory.class);
+        if (registration != null && registration.getProvider() != null) {
+            owners.addAll(registration.getProvider().partners(player.getUniqueId()));
+        }
+
+        Set<UUID> seenProperties = new LinkedHashSet<>();
+        for (UUID ownerId : owners) {
+            for (PropertyMailbox mailbox : properties.mailboxesOwnedBy(ownerId)) {
+                if (seenProperties.add(mailbox.propertyId())) homes.add(mailbox);
+            }
+        }
+        return homes;
     }
 
     private boolean isHome(PropertyMailbox home) {
@@ -269,7 +294,7 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (!(sender instanceof Player player)) return List.of();
         try {
-            List<String> addresses = properties.mailboxesOwnedBy(player.getUniqueId()).stream()
+            List<String> addresses = homesFor(player).stream()
                     .filter(this::isHome)
                     .map(PropertyMailbox::address)
                     .sorted(String.CASE_INSENSITIVE_ORDER)

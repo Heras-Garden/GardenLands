@@ -114,14 +114,18 @@ public final class ClaimOutlineCommand implements CommandExecutor, TabCompleter 
 
     private void start(Player player, LandClaimRecord claim) {
         stop(player.getUniqueId());
-        if (claim.fullHeight()) showGlowstoneBoundary(player, claim);
         final int[] remaining = {40};
+        final int[] pulse = {0};
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!player.isOnline() || --remaining[0] < 0) {
                 stop(player.getUniqueId());
                 return;
             }
             render(player, claim);
+            if (pulse[0]++ % 4 == 0) {
+                showGlowstoneBoundary(player, claim);
+                Bukkit.getScheduler().runTaskLater(plugin, () -> restoreGlowstone(player.getUniqueId()), 20L);
+            }
         }, 0L, 10L);
         active.put(player.getUniqueId(), task);
     }
@@ -129,15 +133,7 @@ public final class ClaimOutlineCommand implements CommandExecutor, TabCompleter 
     private void stop(UUID playerId) {
         BukkitTask task = active.remove(playerId);
         if (task != null) task.cancel();
-        List<Location> locations = fakeGlowstone.remove(playerId);
-        Player player = Bukkit.getPlayer(playerId);
-        if (locations != null && player != null && player.isOnline()) {
-            for (Location location : locations) {
-                if (location.getWorld() != null && player.getWorld().equals(location.getWorld())) {
-                    player.sendBlockChange(location, location.getBlock().getBlockData());
-                }
-            }
-        }
+        restoreGlowstone(playerId);
     }
 
     private void render(Player player, LandClaimRecord claim) {
@@ -145,8 +141,6 @@ public final class ClaimOutlineCommand implements CommandExecutor, TabCompleter 
         if (world == null || !player.getWorld().getUID().equals(claim.worldId()) || claim.vertices().size() < 2) {
             return;
         }
-
-        if (claim.fullHeight()) return;
 
         Particle.DustOptions dust = new Particle.DustOptions(Color.fromRGB(255, 190, 218), 1.35f);
         double bottom = claim.minY() + 0.15;
@@ -164,6 +158,7 @@ public final class ClaimOutlineCommand implements CommandExecutor, TabCompleter 
         World world = Bukkit.getWorld(claim.worldId());
         if (world == null || !player.getWorld().getUID().equals(claim.worldId())) return;
 
+        restoreGlowstone(player.getUniqueId());
         Set<Location> locations = new LinkedHashSet<>();
         for (int i = 0; i < claim.vertices().size() && locations.size() < 500; i++) {
             LandClaimRecord.Point from = claim.vertices().get(i);
@@ -171,13 +166,24 @@ public final class ClaimOutlineCommand implements CommandExecutor, TabCompleter 
             double dx = to.x() - from.x();
             double dz = to.z() - from.z();
             double distance = Math.sqrt(dx * dx + dz * dz);
-            int steps = Math.max(1, (int) Math.ceil(distance / 2.5));
+            int steps = Math.max(1, (int) Math.ceil(distance / 2.0));
             for (int step = 0; step <= steps && locations.size() < 500; step++) {
                 double t = step / (double) steps;
                 int x = (int) Math.round(from.x() + dx * t);
                 int z = (int) Math.round(from.z() + dz * t);
-                int y = Math.min(world.getMaxHeight() - 2, world.getHighestBlockYAt(x, z) + 1);
-                locations.add(new Location(world, x, y, z));
+                if (claim.fullHeight()) {
+                    int y = Math.min(world.getMaxHeight() - 2, world.getHighestBlockYAt(x, z) + 1);
+                    locations.add(new Location(world, x, y, z));
+                } else {
+                    locations.add(new Location(world, x, claim.minY(), z));
+                    locations.add(new Location(world, x, claim.maxY(), z));
+                }
+            }
+            if (!claim.fullHeight()) {
+                int verticalStep = Math.max(1, (claim.maxY() - claim.minY()) / 8);
+                for (int y = claim.minY(); y <= claim.maxY() && locations.size() < 500; y += verticalStep) {
+                    locations.add(new Location(world, from.x(), y, from.z()));
+                }
             }
         }
 
@@ -185,6 +191,17 @@ public final class ClaimOutlineCommand implements CommandExecutor, TabCompleter 
             player.sendBlockChange(location, Material.GLOWSTONE.createBlockData());
         }
         fakeGlowstone.put(player.getUniqueId(), List.copyOf(locations));
+    }
+
+    private void restoreGlowstone(UUID playerId) {
+        List<Location> locations = fakeGlowstone.remove(playerId);
+        Player player = Bukkit.getPlayer(playerId);
+        if (locations == null || player == null || !player.isOnline()) return;
+        for (Location location : locations) {
+            if (location.getWorld() != null && player.getWorld().equals(location.getWorld())) {
+                player.sendBlockChange(location, location.getBlock().getBlockData());
+            }
+        }
     }
 
     private void drawPolygon(Player player, List<LandClaimRecord.Point> points, double y, Particle.DustOptions dust) {
