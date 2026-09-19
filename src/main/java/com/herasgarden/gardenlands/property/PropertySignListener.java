@@ -300,16 +300,39 @@ public final class PropertySignListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onMailboxExtension(BlockPlaceEvent event) {
-        Block block = event.getBlockPlaced();
-        if (!ContainerKey.supported(block)) {
+        Block placed = event.getBlockPlaced();
+        if (!ContainerKey.supported(placed)) {
             return;
         }
-        if (ContainerKey.members(block).size() < 2 || !containers.isMailbox(block)) {
+
+        boolean wouldJoinMailbox = containers.isMailbox(placed)
+                && ContainerKey.members(placed).size() > 1;
+
+        org.bukkit.block.BlockFace[] horizontal = {
+                org.bukkit.block.BlockFace.NORTH,
+                org.bukkit.block.BlockFace.SOUTH,
+                org.bukkit.block.BlockFace.EAST,
+                org.bukkit.block.BlockFace.WEST
+        };
+        for (org.bukkit.block.BlockFace face : horizontal) {
+            Block neighbor = placed.getRelative(face);
+            if (!ContainerKey.supported(neighbor) || !containers.isMailbox(neighbor)) {
+                continue;
+            }
+            if (ContainerKey.members(placed).size() > 1
+                    || ContainerKey.members(neighbor).size() > 1) {
+                wouldJoinMailbox = true;
+                break;
+            }
+        }
+
+        if (!wouldJoinMailbox) {
             return;
         }
+
         event.setCancelled(true);
         GardenMessages.send(event.getPlayer(),
-                "A registered mailbox cannot be extended into a double chest.");
+                "Mailboxes must stay single containers and cannot become double chests.");
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
