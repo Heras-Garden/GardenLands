@@ -77,10 +77,6 @@ public final class GardenChatListener implements Listener, ChatRenderer {
                 ? CosmeticChatProfile.empty()
                 : cosmetics.chatProfile(source.getUniqueId());
 
-        if (profile.donorTagEnabled()) {
-            prefix = prefix.append(Component.text("[Donor]", donorTagColor)).append(Component.space());
-        }
-
         TextColor nameColor = nameColor(source, profile);
         Component displayName = sourceDisplayName.color(nameColor);
         if (profile.fontKey() != null && !profile.fontKey().isBlank()) {

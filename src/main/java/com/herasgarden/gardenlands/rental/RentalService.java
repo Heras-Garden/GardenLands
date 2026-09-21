@@ -450,7 +450,11 @@ public final class RentalService implements ClaimAccessPolicy, ClaimTransferPoli
         if (platform.currency().deposit(renterId, amount)) {
             return true;
         }
-        platform.currency().deposit(ownerId, amount);
+        boolean restored = platform.currency().deposit(ownerId, amount);
+        if (!restored) {
+            plugin.getLogger().severe("Rental payment reversal failed to restore ⟡ " + amount
+                    + " to owner " + ownerId + " after renter refund failure. The Garden order is left for admin review.");
+        }
         return false;
     }
 

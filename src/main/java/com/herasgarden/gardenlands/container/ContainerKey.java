@@ -1,5 +1,6 @@
 package com.herasgarden.gardenlands.container;
 
+import com.herasgarden.gardencore.api.permission.ContainerTypes;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
@@ -16,11 +17,7 @@ public record ContainerKey(UUID worldId, int x, int y, int z) {
             return false;
         }
         Material type = block.getType();
-        String name = type.name();
-        return type == Material.CHEST
-                || type == Material.TRAPPED_CHEST
-                || type == Material.BARREL
-                || name.endsWith("COPPER_CHEST");
+        return ContainerTypes.supported(type);
     }
 
     public static boolean single(Block block) {

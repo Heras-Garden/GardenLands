@@ -88,8 +88,7 @@ public final class ClaimDirectory {
     }
 
     public Optional<LandClaimRecord> findAt(Block block) {
-        return findAllAt(block).stream()
-                .min(Comparator.comparingDouble(LandClaimRecord::area));
+        return findAllAt(block).stream().findFirst();
     }
 
     public List<LandClaimRecord> findAllAt(Block block) {
@@ -100,8 +99,41 @@ public final class ClaimDirectory {
         return claims.values().stream()
                 .filter(claim -> claim.worldId().equals(worldId))
                 .filter(claim -> claim.contains(x, y, z))
-                .sorted(Comparator.comparingDouble(LandClaimRecord::area))
+                .sorted(resolutionComparator().reversed())
                 .toList();
+    }
+
+    private Comparator<LandClaimRecord> resolutionComparator() {
+        return Comparator.comparingInt(this::depth)
+                .thenComparingInt(claim -> specificity(claim.type()))
+                .thenComparing(Comparator.comparingDouble(LandClaimRecord::area).reversed())
+                .thenComparing(claim -> claim.id().toString(), Comparator.reverseOrder());
+    }
+
+    private int depth(LandClaimRecord claim) {
+        int depth = 0;
+        UUID parent = claim.parentId();
+        java.util.HashSet<UUID> seen = new java.util.HashSet<>();
+        while (parent != null && seen.add(parent)) {
+            LandClaimRecord current = claims.get(parent);
+            if (current == null) break;
+            depth++;
+            parent = current.parentId();
+        }
+        return depth;
+    }
+
+    private int specificity(String type) {
+        if (type == null) return 0;
+        return switch (type.toUpperCase(java.util.Locale.ROOT)) {
+            case "UNIT" -> 6;
+            case "HOME" -> 5;
+            case "PROPERTY" -> 4;
+            case "PROTECTED" -> 3;
+            case "DISTRICT" -> 2;
+            case "TERRITORY" -> 1;
+            default -> 0;
+        };
     }
 
     public boolean isSameOrAncestor(LandClaimRecord candidate, LandClaimRecord descendant) {

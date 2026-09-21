@@ -239,6 +239,12 @@ public final class ContainerPermissionService implements ContainerAccessPolicy {
         remove(block);
     }
 
+    public boolean hasCoordinateState(Block block) {
+        if (!ContainerKey.supported(block)) return false;
+        ContainerKey key = ContainerKey.of(block);
+        return overrides.containsKey(key) || mobAccess.containsKey(key);
+    }
+
     public void remove(Block block) throws SQLException {
         if (!ContainerKey.supported(block)) {
             return;

@@ -16,7 +16,7 @@ public final class ContainerCleanupListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
-        if (!ContainerKey.supported(event.getBlock()) || permissions.get(event.getBlock()).isEmpty()) {
+        if (!ContainerKey.supported(event.getBlock()) || !permissions.hasCoordinateState(event.getBlock())) {
             return;
         }
         try {
