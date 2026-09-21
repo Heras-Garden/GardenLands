@@ -14,6 +14,7 @@ import com.herasgarden.gardencore.api.permission.ClaimAccessPolicy;
 import com.herasgarden.gardencore.api.storage.GardenStorage;
 import com.herasgarden.gardenlands.claim.ClaimDirectory;
 import com.herasgarden.gardenlands.claim.LandClaimRecord;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.sql.Connection;
@@ -452,7 +453,7 @@ public final class RentalService implements ClaimAccessPolicy, ClaimTransferPoli
         }
         boolean restored = platform.currency().deposit(ownerId, amount);
         if (!restored) {
-            plugin.getLogger().severe("Rental payment reversal failed to restore ⟡ " + amount
+            Bukkit.getLogger().severe("Rental payment reversal failed to restore ⟡ " + amount
                     + " to owner " + ownerId + " after renter refund failure. The Garden order is left for admin review.");
         }
         return false;
