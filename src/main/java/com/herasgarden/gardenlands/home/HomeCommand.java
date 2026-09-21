@@ -6,13 +6,13 @@ import com.herasgarden.gardencore.api.land.PropertyMailbox;
 import com.herasgarden.gardencore.api.land.PropertyManagementService;
 import com.herasgarden.gardencore.api.land.PropertySignBinding;
 import com.herasgarden.gardencore.api.land.PropertySignKind;
+import com.herasgarden.gardencore.api.ui.GardenMessages;
 import com.herasgarden.gardenlands.claim.ClaimDirectory;
 import com.herasgarden.gardenlands.claim.LandClaimRecord;
 import com.herasgarden.gardenlands.ui.LandsMessages;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -135,12 +135,15 @@ public final class HomeCommand implements CommandExecutor, TabCompleter {
     }
 
     private void showPicker(Player player, List<PropertyMailbox> homes) {
-        LandsMessages.send(player, "Choose a home address:");
+        player.sendMessage(GardenMessages.prefix()
+                .append(Component.text("Homes", GardenMessages.PETAL_FROST)));
+        player.sendMessage(Component.text("Choose the address you want to teleport to.", GardenMessages.NEUTRAL_GRAY));
         for (PropertyMailbox home : homes) {
-            Component line = Component.text("[Home] ", NamedTextColor.GREEN)
+            Component line = Component.text("[Home] ", GardenMessages.MUTED_OLIVE)
                     .clickEvent(ClickEvent.runCommand("/home " + home.address()))
-                    .hoverEvent(HoverEvent.showText(Component.text("Teleport to " + home.address())))
-                    .append(Component.text(home.address(), NamedTextColor.WHITE));
+                    .hoverEvent(HoverEvent.showText(
+                            Component.text("Teleport to " + home.address(), GardenMessages.NEUTRAL_GRAY)))
+                    .append(Component.text(home.address(), GardenMessages.MESSAGE_COLOR));
             player.sendMessage(line);
         }
     }

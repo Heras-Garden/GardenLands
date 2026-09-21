@@ -30,10 +30,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public final class PropertyCommand implements CommandExecutor, TabCompleter {
-    private static final TextColor TEXT = TextColor.color(0xE7E3E5);
-    private static final TextColor MUTED = TextColor.color(0xB9B4B6);
-    private static final TextColor ACCENT = TextColor.color(0xC7A6B4);
-    private static final TextColor NEGATIVE = TextColor.color(0xC5A3A3);
+    private static final TextColor TEXT = GardenMessages.MESSAGE_COLOR;
+    private static final TextColor MUTED = GardenMessages.NEUTRAL_GRAY;
+    private static final TextColor ACCENT = GardenMessages.PETAL_FROST;
+    private static final TextColor NEGATIVE = GardenMessages.BUBBLEGUM_PINK;
 
     private final PropertyDirectory properties;
     private final PropertyManagementService management;
@@ -401,7 +401,11 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
     private void sendEditMenu(Player player, PropertyAddress property) {
         player.sendActionBar(Component.text("Property editor | " + property.display(), MUTED));
         Component menu = GardenMessages.prefix()
-                .append(Component.text("Edit " + property.display(), TEXT))
+                .append(Component.text("Property editor", GardenMessages.PETAL_FROST))
+                .append(Component.newline())
+                .append(Component.text(property.display(), TEXT))
+                .append(Component.newline())
+                .append(Component.text("Choose what you want to change.", MUTED))
                 .append(Component.newline())
                 .append(suggestButton("Price", "/property editid " + property.propertyId() + " price ",
                         "Change the sale price."))
@@ -422,6 +426,8 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
 
     private void sendDeletePrompt(Player player, PropertyAddress property) {
         Component prompt = GardenMessages.prefix()
+                .append(Component.text("Delete property", GardenMessages.PETAL_FROST))
+                .append(Component.newline())
                 .append(Component.text(
                         "Delete " + property.display()
                                 + "? This also deletes its claim and every linked property/mailbox sign.",
