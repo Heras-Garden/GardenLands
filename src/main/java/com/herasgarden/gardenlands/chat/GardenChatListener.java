@@ -2,7 +2,7 @@ package com.herasgarden.gardenlands.chat;
 
 import com.herasgarden.gardencore.api.cosmetic.CosmeticChatProfile;
 import com.herasgarden.gardencore.api.cosmetic.CosmeticProfileService;
-import com.herasgarden.gardenlands.citizen.CitizenshipService;
+import com.herasgarden.gardencore.api.membership.TerritoryMembershipProvider;
 import com.herasgarden.gardenlands.territory.TerritoryGlyphService;
 import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -20,7 +20,7 @@ import java.util.UUID;
 
 /** Renders Garden chat without doing database work on the async chat thread. */
 public final class GardenChatListener implements Listener, ChatRenderer {
-    private final CitizenshipService citizenship;
+    private final TerritoryMembershipProvider memberships;
     private final TerritoryGlyphService glyphs;
     private final CosmeticProfileService cosmetics;
     private final String separator;
@@ -31,7 +31,7 @@ public final class GardenChatListener implements Listener, ChatRenderer {
     private final TextColor donorTagColor;
 
     public GardenChatListener(
-            CitizenshipService citizenship,
+            TerritoryMembershipProvider memberships,
             TerritoryGlyphService glyphs,
             CosmeticProfileService cosmetics,
             String separator,
@@ -41,7 +41,7 @@ public final class GardenChatListener implements Listener, ChatRenderer {
             String ownerNameColor,
             String donorTagColor
     ) {
-        this.citizenship = citizenship;
+        this.memberships = memberships;
         this.glyphs = glyphs;
         this.cosmetics = cosmetics;
         this.separator = separator == null || separator.isBlank() ? ">>" : separator.trim();
@@ -65,7 +65,7 @@ public final class GardenChatListener implements Listener, ChatRenderer {
                 .build();
 
         Component prefix = head.append(Component.space());
-        UUID territoryClaim = citizenship.territoryClaimOfCached(source.getUniqueId()).orElse(null);
+        UUID territoryClaim = memberships == null ? null : memberships.territoryClaimOf(source.getUniqueId()).orElse(null);
         if (territoryClaim != null) {
             Component flag = glyphs.component(territoryClaim).orElse(null);
             if (flag != null) {

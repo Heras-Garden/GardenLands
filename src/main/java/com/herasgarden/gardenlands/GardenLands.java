@@ -4,7 +4,7 @@ import com.herasgarden.gardencore.api.GardenPlatform;
 import com.herasgarden.gardencore.api.claim.ClaimOwnershipBridge;
 import com.herasgarden.gardencore.api.claim.ClaimTransferPolicy;
 import com.herasgarden.gardencore.api.cosmetic.CosmeticProfileService;
-import com.herasgarden.gardencore.api.land.GardenCitizenshipDirectory;
+import com.herasgarden.gardencore.api.membership.TerritoryMembershipProvider;
 import com.herasgarden.gardencore.api.land.GardenTerritoryDirectory;
 import com.herasgarden.gardencore.api.land.LandAccessService;
 import com.herasgarden.gardencore.api.land.PropertyDirectory;
@@ -18,8 +18,6 @@ import com.herasgarden.gardenlands.api.LandsTerritoryDirectory;
 import com.herasgarden.gardenlands.acquisition.LandPurchaseOfferService;
 import com.herasgarden.gardenlands.bluemap.BlueMapIntegration;
 import com.herasgarden.gardenlands.chat.GardenChatListener;
-import com.herasgarden.gardenlands.citizen.CitizenCommand;
-import com.herasgarden.gardenlands.citizen.CitizenshipService;
 import com.herasgarden.gardenlands.claim.ClaimDirectory;
 import com.herasgarden.gardenlands.claim.ClaimOutlineCommand;
 import com.herasgarden.gardenlands.claim.LandsAccessService;
@@ -52,7 +50,7 @@ import java.sql.SQLException;
 public final class GardenLands extends JavaPlugin {
     private GardenPlatform platform;
     private TerritoryDirectory territoryDirectory;
-    private CitizenshipService citizenshipService;
+    private TerritoryMembershipProvider memberships;
     private TerritoryGlyphService glyphService;
     private ClaimDirectory claimDirectory;
     private ContainerPermissionService containerPermissions;
@@ -83,6 +81,8 @@ public final class GardenLands extends JavaPlugin {
                 getServer().getServicesManager().getRegistration(ClaimOwnershipBridge.class);
         RegisteredServiceProvider<CosmeticProfileService> cosmeticRegistration =
                 getServer().getServicesManager().getRegistration(CosmeticProfileService.class);
+        RegisteredServiceProvider<TerritoryMembershipProvider> membershipRegistration =
+                getServer().getServicesManager().getRegistration(TerritoryMembershipProvider.class);
         if (ownershipRegistration == null || ownershipRegistration.getProvider() == null) {
             getLogger().severe("GardenCore claim ownership bridge is unavailable.");
             getServer().getPluginManager().disablePlugin(this);
@@ -102,13 +102,12 @@ public final class GardenLands extends JavaPlugin {
         platform = registration.getProvider();
         propertyManagement = propertyManagementRegistration.getProvider();
         organizations = organizationRegistration.getProvider();
+        memberships = membershipRegistration == null ? null : membershipRegistration.getProvider();
         try {
             LandsSchema.ensure(platform.storage());
 
             territoryDirectory = new TerritoryDirectory(platform.storage());
             territoryDirectory.refresh();
-            citizenshipService = new CitizenshipService(platform, territoryDirectory);
-            citizenshipService.refresh();
             glyphService = new TerritoryGlyphService(this, platform.storage(), territoryDirectory);
             glyphService.refresh();
 
@@ -140,20 +139,11 @@ public final class GardenLands extends JavaPlugin {
         getServer().getServicesManager().register(
                 GardenTerritoryDirectory.class, territoryApi, this, ServicePriority.Normal);
         getServer().getServicesManager().register(
-                GardenCitizenshipDirectory.class, citizenshipService, this, ServicePriority.Normal);
-        getServer().getServicesManager().register(
                 ClaimAccessPolicy.class, rentalService, this, ServicePriority.Normal);
         getServer().getServicesManager().register(
                 ClaimTransferPolicy.class, rentalService, this, ServicePriority.Normal);
 
-        CitizenCommand citizenCommand = new CitizenCommand(citizenshipService, territoryDirectory);
-        PluginCommand citizen = getCommand("citizen");
-        if (citizen != null) {
-            citizen.setExecutor(citizenCommand);
-            citizen.setTabCompleter(citizenCommand);
-        }
-
-        TerritoryCommand territoryCommand = new TerritoryCommand(territoryDirectory, citizenshipService);
+        TerritoryCommand territoryCommand = new TerritoryCommand(territoryDirectory, memberships);
         PluginCommand territory = getCommand("territory");
         if (territory != null) {
             territory.setExecutor(territoryCommand);
@@ -220,7 +210,7 @@ public final class GardenLands extends JavaPlugin {
                     ? null : cosmeticRegistration.getProvider();
             getServer().getPluginManager().registerEvents(
                     new GardenChatListener(
-                            citizenshipService,
+                            memberships,
                             glyphService,
                             cosmeticProfiles,
                             getConfig().getString("chat.separator", ">>"),
@@ -255,7 +245,6 @@ public final class GardenLands extends JavaPlugin {
         getServer().getScheduler().runTaskTimerAsynchronously(this, () -> {
             try {
                 territoryDirectory.refresh();
-                citizenshipService.refresh();
                 glyphService.refresh();
                 claimDirectory.refresh();
                 containerPermissions.refresh();
@@ -266,7 +255,7 @@ public final class GardenLands extends JavaPlugin {
             }
         }, refreshTicks, refreshTicks);
 
-        getLogger().info("GardenLands enabled. Land, property commands, rentals, citizenship, acquisitions, BlueMap, and access settings are active.");
+        getLogger().info("GardenLands enabled. Land, property commands, rentals, acquisitions, BlueMap, and access settings are active.");
     }
 
     @Override
@@ -285,8 +274,8 @@ public final class GardenLands extends JavaPlugin {
         return territoryDirectory;
     }
 
-    public CitizenshipService citizenship() {
-        return citizenshipService;
+    public TerritoryMembershipProvider memberships() {
+        return memberships;
     }
 
     public TerritoryGlyphService glyphs() {

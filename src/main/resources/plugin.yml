@@ -4,14 +4,11 @@ main: com.herasgarden.gardenlands.GardenLands
 api-version: '26.2'
 author: Hera's Garden
 website: https://herasgarden.net
-description: Land, housing, property, territory, and citizenship systems for The Garden SMP.
+description: Land, housing, property, territory, and access systems for The Garden SMP.
 depend: [GardenCore]
 softdepend: [BlueMap, GardenCosmetics]
 
 commands:
-  citizen:
-    description: Choose and view your territory affiliation.
-    usage: /citizen <status|join|leave|list>
   territory:
     description: Garden territory commands.
     usage: /territory <list|info>
@@ -39,10 +36,6 @@ commands:
     usage: /rent <info|list <price> <duration>|nightly <price> [max-nights]|accept|book <nights>|cancel|status>
 
 permissions:
-  gardenlands.citizen:
-    default: true
-  gardenlands.citizen.list:
-    default: true
   gardenlands.territory.view:
     default: true
   gardenlands.container.manage:

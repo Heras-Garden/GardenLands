@@ -1,6 +1,6 @@
 package com.herasgarden.gardenlands.territory;
 
-import com.herasgarden.gardenlands.citizen.CitizenshipService;
+import com.herasgarden.gardencore.api.membership.TerritoryMembershipProvider;
 import com.herasgarden.gardenlands.ui.LandsMessages;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -13,11 +13,11 @@ import java.util.List;
 
 public final class TerritoryCommand implements CommandExecutor, TabCompleter {
     private final TerritoryDirectory territories;
-    private final CitizenshipService citizenship;
+    private final TerritoryMembershipProvider memberships;
 
-    public TerritoryCommand(TerritoryDirectory territories, CitizenshipService citizenship) {
+    public TerritoryCommand(TerritoryDirectory territories, TerritoryMembershipProvider memberships) {
         this.territories = territories;
-        this.citizenship = citizenship;
+        this.memberships = memberships;
     }
 
     @Override
@@ -43,7 +43,11 @@ public final class TerritoryCommand implements CommandExecutor, TabCompleter {
                 String name = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
                 TerritoryRecord territory = territories.findByName(name)
                         .orElseThrow(() -> new IllegalArgumentException("That territory does not exist."));
-                int count = citizenship.citizens(territory.claimId()).size();
+                if (memberships == null) {
+                    LandsMessages.send(sender, territory.name() + " is available, but citizenship data is unavailable because GardenCivics is not enabled.");
+                    return true;
+                }
+                int count = memberships.members(territory.claimId()).size();
                 LandsMessages.send(sender, territory.name() + " has " + count + " declared citizen" + (count == 1 ? "" : "s") + ".");
                 return true;
             }
