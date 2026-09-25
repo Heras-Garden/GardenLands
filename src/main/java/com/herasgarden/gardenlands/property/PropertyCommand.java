@@ -146,15 +146,18 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
         Player player = requirePlayer(sender, "This command must be used in-game.");
         if (player == null) return true;
         if (args.length < 2) {
-            GardenMessages.send(player, "Use /property sell <price> while standing inside the property.");
+            GardenMessages.send(player, "Use /property sell <price> [any|player|society] while standing inside the property.");
             return true;
         }
 
         long price = positiveLong(args[1], "The sale price must be a positive whole number of Obols.");
+        String audience = args.length >= 3 ? normalizeAudience(args[2]) : "ANY";
         PropertyAddress property = currentProperty(player);
         requireManage(player, requireClaim(property.claimId()));
+        management.setBuyerAudience(property.propertyId(), audience);
         property = management.setForSale(property.propertyId(), price);
-        GardenMessages.send(player, property.display() + " is for sale for ⟡ " + price + ".");
+        GardenMessages.send(player, property.display() + " is for sale for ⟡ " + price
+                + " to " + audienceLabel(audience) + ".");
         return true;
     }
 
@@ -246,6 +249,15 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
                         property.propertyId(), property.road(), property.number(), unit);
                 GardenMessages.send(player, "Unit updated. Address: " + updated.display() + ".");
             }
+            case "audience" -> {
+                if (args.length <= valueStart) {
+                    GardenMessages.send(player, "Use audience any, player, or society.");
+                    return;
+                }
+                String audience = normalizeAudience(args[valueStart]);
+                management.setBuyerAudience(property.propertyId(), audience);
+                GardenMessages.send(player, "Buyer audience set to " + audienceLabel(audience) + ".");
+            }
             case "offmarket" -> {
                 PropertyAddress updated = management.takeOffMarket(property.propertyId());
                 GardenMessages.send(player, updated.display() + " is no longer for sale.");
@@ -306,7 +318,10 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
 
         PropertyAddress property = currentProperty(player);
         LandClaimRecord claim = requireClaim(property.claimId());
-        String market = property.forSale() ? "For sale: ⟡ " + property.price() : "Not for sale";
+        String audience = management.buyerAudience(property.propertyId());
+        String market = property.forSale()
+                ? "For sale: ⟡ " + property.price() + " | Buyers: " + audienceLabel(audience)
+                : "Not for sale";
         GardenMessages.send(player,
                 property.display() + " | Owner: " + ownerDisplay(claim) + " | " + market + ".");
         return true;
@@ -416,6 +431,9 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
                 .append(suggestButton("Unit", "/property editid " + property.propertyId() + " unit ",
                         "Set a unit label, or type none."))
                 .append(Component.space())
+                .append(suggestButton("Buyer Audience", "/property editid " + property.propertyId() + " audience ",
+                        "Choose any, player, or society."))
+                .append(Component.space())
                 .append(runButton("Off Market", "/property editid " + property.propertyId() + " offmarket",
                         MUTED, "Remove the property from sale."))
                 .append(Component.space())
@@ -440,6 +458,24 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
                 .append(Component.space())
                 .append(runButton("No", "/property canceldelete", MUTED, "Keep the property."));
         player.sendMessage(prompt);
+    }
+
+    private String normalizeAudience(String value) {
+        String audience = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        return switch (audience) {
+            case "ANY" -> "ANY";
+            case "PLAYER", "PLAYERS" -> "PLAYER";
+            case "SOCIETY", "NPC", "NPCS" -> "SOCIETY";
+            default -> throw new IllegalArgumentException("Buyer audience must be any, player, or society.");
+        };
+    }
+
+    private String audienceLabel(String audience) {
+        return switch (audience == null ? "ANY" : audience.toUpperCase(Locale.ROOT)) {
+            case "PLAYER" -> "players only";
+            case "SOCIETY" -> "Society residents only";
+            default -> "players or Society residents";
+        };
     }
 
     private long positiveLong(String value, String error) {
@@ -477,7 +513,7 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
 
     private void help(CommandSender sender) {
         GardenMessages.send(sender,
-                "Use /property <register|registerunit|sell|market|edit|delete|mailbox|info|buy|list>.");
+                "Use /property <register|registerunit|sell|market|edit|delete|mailbox|info|buy|list>. Sell supports buyer audience: any, player, or society.");
     }
 
     @Override
@@ -494,8 +530,19 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("edit")) {
             String prefix = args[1].toLowerCase(Locale.ROOT);
-            return List.of("price", "address", "unit")
+            return List.of("price", "address", "unit", "audience")
                     .stream().filter(value -> value.startsWith(prefix)).toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("edit")
+                && args[1].equalsIgnoreCase("audience")) {
+            String prefix = args[2].toLowerCase(Locale.ROOT);
+            return List.of("any", "player", "society").stream()
+                    .filter(value -> value.startsWith(prefix)).toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("sell")) {
+            String prefix = args[2].toLowerCase(Locale.ROOT);
+            return List.of("any", "player", "society").stream()
+                    .filter(value -> value.startsWith(prefix)).toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("edit")
                 && args[1].equalsIgnoreCase("unit")) {
