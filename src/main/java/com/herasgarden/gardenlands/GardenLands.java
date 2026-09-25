@@ -10,6 +10,7 @@ import com.herasgarden.gardencore.api.land.GardenTerritoryDirectory;
 import com.herasgarden.gardencore.api.land.LandAccessService;
 import com.herasgarden.gardencore.api.land.PropertyDirectory;
 import com.herasgarden.gardencore.api.land.PropertyManagementService;
+import com.herasgarden.gardencore.api.land.PropertyHabitabilityService;
 import com.herasgarden.gardencore.api.organization.OrganizationDirectory;
 import com.herasgarden.gardencore.api.permission.ClaimAccessPolicy;
 import com.herasgarden.gardencore.api.permission.ContainerAccessPolicy;
@@ -39,6 +40,7 @@ import com.herasgarden.gardenlands.property.PropertyCommand;
 import com.herasgarden.gardenlands.property.PropertySignListener;
 import com.herasgarden.gardenlands.rental.RentalCommand;
 import com.herasgarden.gardenlands.rental.RentalService;
+import com.herasgarden.gardenlands.property.LandsPropertyHabitabilityService;
 import com.herasgarden.gardenlands.storage.LandsSchema;
 import com.herasgarden.gardenlands.territory.TerritoryCommand;
 import com.herasgarden.gardenlands.territory.TerritoryDirectory;
@@ -143,6 +145,11 @@ public final class GardenLands extends JavaPlugin {
                 ClaimAccessPolicy.class, rentalService, this, ServicePriority.Normal);
         getServer().getServicesManager().register(
                 ClaimTransferPolicy.class, rentalService, this, ServicePriority.Normal);
+        getServer().getServicesManager().register(
+                PropertyHabitabilityService.class,
+                new LandsPropertyHabitabilityService(claimDirectory, rentalService),
+                this,
+                ServicePriority.Normal);
 
         TerritoryCommand territoryCommand = new TerritoryCommand(territoryDirectory, this::membershipProvider);
         PluginCommand territory = getCommand("territory");
