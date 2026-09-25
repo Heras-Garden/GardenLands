@@ -20,6 +20,7 @@ import com.herasgarden.gardenlands.bluemap.BlueMapIntegration;
 import com.herasgarden.gardenlands.chat.GardenChatListener;
 import com.herasgarden.gardenlands.claim.ClaimDirectory;
 import com.herasgarden.gardenlands.claim.ClaimOutlineCommand;
+import com.herasgarden.gardenlands.claim.ClaimStickOutlineListener;
 import com.herasgarden.gardenlands.claim.LandsAccessService;
 import com.herasgarden.gardenlands.container.ContainerCleanupListener;
 import com.herasgarden.gardenlands.container.ContainerCommand;
@@ -200,6 +201,7 @@ public final class GardenLands extends JavaPlugin {
             outline.setExecutor(outlineCommand);
             outline.setTabCompleter(outlineCommand);
         }
+        getServer().getPluginManager().registerEvents(new ClaimStickOutlineListener(outlineCommand), this);
 
         if (getConfig().getBoolean("chat.enabled", true)) {
             CosmeticProfileService cosmeticProfiles = cosmeticRegistration == null

@@ -112,6 +112,22 @@ public final class ClaimOutlineCommand implements CommandExecutor, TabCompleter 
         return matches.isEmpty() ? null : matches.get(0);
     }
 
+    public void showHere(Player player) {
+        try {
+            claims.refresh();
+            LandClaimRecord claim = claims.findAt(player.getLocation().getBlock()).orElse(null);
+            if (claim == null) {
+                LandsMessages.send(player, "There is no claim at your location.");
+                return;
+            }
+            start(player, claim);
+            LandsMessages.send(player, "Showing " + claim.type().replace('_', ' ').toLowerCase(Locale.ROOT)
+                    + " " + claim.id().toString().substring(0, 8) + " for 20 seconds.");
+        } catch (SQLException exception) {
+            LandsMessages.send(player, "Claim outlines could not be loaded right now.");
+        }
+    }
+
     private void start(Player player, LandClaimRecord claim) {
         stop(player.getUniqueId());
         final int[] remaining = {40};

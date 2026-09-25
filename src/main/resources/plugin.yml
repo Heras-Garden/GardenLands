@@ -11,7 +11,7 @@ softdepend: [BlueMap, GardenCosmetics]
 commands:
   territory:
     description: Garden territory commands.
-    usage: /territory <list|info>
+    usage: /territory <list|info|population>
   chest:
     description: Edit the per-container permissions for the chest or barrel you are looking at.
     usage: /chest [reset|cycle <open|insert|take|break>|set <action> <inherit|allow|deny>]
