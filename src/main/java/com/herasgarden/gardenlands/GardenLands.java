@@ -1,6 +1,7 @@
 package com.herasgarden.gardenlands;
 
 import com.herasgarden.gardencore.api.GardenPlatform;
+import com.herasgarden.gardencore.api.claim.ClaimDirectoryService;
 import com.herasgarden.gardencore.api.claim.ClaimOwnershipBridge;
 import com.herasgarden.gardencore.api.claim.ClaimTransferPolicy;
 import com.herasgarden.gardencore.api.cosmetic.CosmeticProfileService;
@@ -22,6 +23,7 @@ import com.herasgarden.gardenlands.claim.ClaimDirectory;
 import com.herasgarden.gardenlands.claim.ClaimOutlineCommand;
 import com.herasgarden.gardenlands.claim.ClaimStickOutlineListener;
 import com.herasgarden.gardenlands.claim.LandsAccessService;
+import com.herasgarden.gardenlands.claim.LandsClaimDirectoryService;
 import com.herasgarden.gardenlands.container.ContainerCleanupListener;
 import com.herasgarden.gardenlands.container.ContainerCommand;
 import com.herasgarden.gardenlands.container.ContainerMobAccessListener;
@@ -131,6 +133,8 @@ public final class GardenLands extends JavaPlugin {
                 DoorAccessPolicy.class, doorPermissions, this, ServicePriority.Normal);
         getServer().getServicesManager().register(
                 LandAccessService.class, new LandsAccessService(claimDirectory), this, ServicePriority.Normal);
+        getServer().getServicesManager().register(
+                ClaimDirectoryService.class, new LandsClaimDirectoryService(claimDirectory), this, ServicePriority.Normal);
         getServer().getServicesManager().register(
                 PropertyDirectory.class, propertyDirectory, this, ServicePriority.Normal);
         getServer().getServicesManager().register(
