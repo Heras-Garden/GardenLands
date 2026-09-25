@@ -12,13 +12,6 @@ public final class LandsSchema {
 
     public static void ensure(GardenStorage storage) throws SQLException {
         try (Connection connection = storage.connection(); Statement statement = connection.createStatement()) {
-            statement.executeUpdate("CREATE TABLE IF NOT EXISTS gl_citizenships ("
-                    + "player_uuid VARCHAR(36) PRIMARY KEY,"
-                    + "territory_claim_uuid VARCHAR(36) NOT NULL,"
-                    + "joined_at BIGINT NOT NULL)");
-            statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_gl_citizenships_territory "
-                    + "ON gl_citizenships (territory_claim_uuid, joined_at)");
-
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS gl_territory_glyphs ("
                     + "territory_claim_uuid VARCHAR(36) PRIMARY KEY,"
                     + "codepoint INTEGER NOT NULL UNIQUE,"
