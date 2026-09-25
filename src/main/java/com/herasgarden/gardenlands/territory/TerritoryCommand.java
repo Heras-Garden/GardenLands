@@ -36,6 +36,23 @@ public final class TerritoryCommand implements CommandExecutor, TabCompleter {
                 }
                 return true;
             }
+            if (args[0].equalsIgnoreCase("population")) {
+                if (args.length < 2) {
+                    LandsMessages.send(sender, "Usage: /territory population <name>");
+                    return true;
+                }
+                String name = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+                TerritoryRecord territory = territories.findByName(name)
+                        .orElseThrow(() -> new IllegalArgumentException("That territory does not exist."));
+                TerritoryMembershipProvider membershipProvider = memberships.get();
+                if (membershipProvider == null) {
+                    LandsMessages.send(sender, "Population data is unavailable because GardenCivics is not enabled.");
+                    return true;
+                }
+                int count = membershipProvider.members(territory.claimId()).size();
+                LandsMessages.send(sender, territory.name() + " population: " + count + ".");
+                return true;
+            }
             if (args[0].equalsIgnoreCase("info")) {
                 if (args.length < 2) {
                     LandsMessages.send(sender, "Usage: /territory info <name>");
@@ -53,7 +70,7 @@ public final class TerritoryCommand implements CommandExecutor, TabCompleter {
                 LandsMessages.send(sender, territory.name() + " has " + count + " declared citizen" + (count == 1 ? "" : "s") + ".");
                 return true;
             }
-            LandsMessages.send(sender, "Usage: /territory <list|info>");
+            LandsMessages.send(sender, "Usage: /territory <list|info|population>");
         } catch (IllegalArgumentException exception) {
             LandsMessages.send(sender, exception.getMessage());
         } catch (SQLException exception) {
@@ -65,11 +82,11 @@ public final class TerritoryCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return List.of("list", "info").stream()
+            return List.of("list", "info", "population").stream()
                     .filter(value -> value.startsWith(args[0].toLowerCase()))
                     .toList();
         }
-        if (args.length >= 2 && args[0].equalsIgnoreCase("info")) {
+        if (args.length >= 2 && (args[0].equalsIgnoreCase("info") || args[0].equalsIgnoreCase("population"))) {
             try {
                 territories.refresh();
                 String prefix = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).toLowerCase();
