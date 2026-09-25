@@ -50,7 +50,6 @@ import java.sql.SQLException;
 public final class GardenLands extends JavaPlugin {
     private GardenPlatform platform;
     private TerritoryDirectory territoryDirectory;
-    private TerritoryMembershipProvider memberships;
     private TerritoryGlyphService glyphService;
     private ClaimDirectory claimDirectory;
     private ContainerPermissionService containerPermissions;
@@ -81,8 +80,6 @@ public final class GardenLands extends JavaPlugin {
                 getServer().getServicesManager().getRegistration(ClaimOwnershipBridge.class);
         RegisteredServiceProvider<CosmeticProfileService> cosmeticRegistration =
                 getServer().getServicesManager().getRegistration(CosmeticProfileService.class);
-        RegisteredServiceProvider<TerritoryMembershipProvider> membershipRegistration =
-                getServer().getServicesManager().getRegistration(TerritoryMembershipProvider.class);
         if (ownershipRegistration == null || ownershipRegistration.getProvider() == null) {
             getLogger().severe("GardenCore claim ownership bridge is unavailable.");
             getServer().getPluginManager().disablePlugin(this);
@@ -102,7 +99,6 @@ public final class GardenLands extends JavaPlugin {
         platform = registration.getProvider();
         propertyManagement = propertyManagementRegistration.getProvider();
         organizations = organizationRegistration.getProvider();
-        memberships = membershipRegistration == null ? null : membershipRegistration.getProvider();
         try {
             LandsSchema.ensure(platform.storage());
 
@@ -143,7 +139,7 @@ public final class GardenLands extends JavaPlugin {
         getServer().getServicesManager().register(
                 ClaimTransferPolicy.class, rentalService, this, ServicePriority.Normal);
 
-        TerritoryCommand territoryCommand = new TerritoryCommand(territoryDirectory, memberships);
+        TerritoryCommand territoryCommand = new TerritoryCommand(territoryDirectory, this::membershipProvider);
         PluginCommand territory = getCommand("territory");
         if (territory != null) {
             territory.setExecutor(territoryCommand);
@@ -210,7 +206,7 @@ public final class GardenLands extends JavaPlugin {
                     ? null : cosmeticRegistration.getProvider();
             getServer().getPluginManager().registerEvents(
                     new GardenChatListener(
-                            memberships,
+                            this::membershipProvider,
                             glyphService,
                             cosmeticProfiles,
                             getConfig().getString("chat.separator", ">>"),
@@ -275,7 +271,13 @@ public final class GardenLands extends JavaPlugin {
     }
 
     public TerritoryMembershipProvider memberships() {
-        return memberships;
+        return membershipProvider();
+    }
+
+    private TerritoryMembershipProvider membershipProvider() {
+        RegisteredServiceProvider<TerritoryMembershipProvider> registration =
+                getServer().getServicesManager().getRegistration(TerritoryMembershipProvider.class);
+        return registration == null ? null : registration.getProvider();
     }
 
     public TerritoryGlyphService glyphs() {
