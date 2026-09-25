@@ -17,10 +17,11 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /** Renders Garden chat without doing database work on the async chat thread. */
 public final class GardenChatListener implements Listener, ChatRenderer {
-    private final TerritoryMembershipProvider memberships;
+    private final Supplier<TerritoryMembershipProvider> memberships;
     private final TerritoryGlyphService glyphs;
     private final CosmeticProfileService cosmetics;
     private final String separator;
@@ -31,7 +32,7 @@ public final class GardenChatListener implements Listener, ChatRenderer {
     private final TextColor donorTagColor;
 
     public GardenChatListener(
-            TerritoryMembershipProvider memberships,
+            Supplier<TerritoryMembershipProvider> memberships,
             TerritoryGlyphService glyphs,
             CosmeticProfileService cosmetics,
             String separator,
@@ -65,7 +66,10 @@ public final class GardenChatListener implements Listener, ChatRenderer {
                 .build();
 
         Component prefix = head.append(Component.space());
-        UUID territoryClaim = memberships == null ? null : memberships.territoryClaimOf(source.getUniqueId()).orElse(null);
+        TerritoryMembershipProvider membershipProvider = memberships.get();
+        UUID territoryClaim = membershipProvider == null
+                ? null
+                : membershipProvider.territoryClaimOf(source.getUniqueId()).orElse(null);
         if (territoryClaim != null) {
             Component flag = glyphs.component(territoryClaim).orElse(null);
             if (flag != null) {
