@@ -10,12 +10,13 @@ import org.bukkit.command.TabCompleter;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Supplier;
 
 public final class TerritoryCommand implements CommandExecutor, TabCompleter {
     private final TerritoryDirectory territories;
-    private final TerritoryMembershipProvider memberships;
+    private final Supplier<TerritoryMembershipProvider> memberships;
 
-    public TerritoryCommand(TerritoryDirectory territories, TerritoryMembershipProvider memberships) {
+    public TerritoryCommand(TerritoryDirectory territories, Supplier<TerritoryMembershipProvider> memberships) {
         this.territories = territories;
         this.memberships = memberships;
     }
@@ -43,11 +44,12 @@ public final class TerritoryCommand implements CommandExecutor, TabCompleter {
                 String name = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
                 TerritoryRecord territory = territories.findByName(name)
                         .orElseThrow(() -> new IllegalArgumentException("That territory does not exist."));
-                if (memberships == null) {
+                TerritoryMembershipProvider membershipProvider = memberships.get();
+                if (membershipProvider == null) {
                     LandsMessages.send(sender, territory.name() + " is available, but citizenship data is unavailable because GardenCivics is not enabled.");
                     return true;
                 }
-                int count = memberships.members(territory.claimId()).size();
+                int count = membershipProvider.members(territory.claimId()).size();
                 LandsMessages.send(sender, territory.name() + " has " + count + " declared citizen" + (count == 1 ? "" : "s") + ".");
                 return true;
             }
