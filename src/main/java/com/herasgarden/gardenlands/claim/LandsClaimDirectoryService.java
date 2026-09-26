@@ -3,6 +3,7 @@ package com.herasgarden.gardenlands.claim;
 import com.herasgarden.gardencore.api.claim.ClaimDirectoryService;
 import com.herasgarden.gardencore.api.claim.ClaimSummary;
 
+import java.sql.SQLException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +18,11 @@ public final class LandsClaimDirectoryService implements ClaimDirectoryService {
     @Override
     public Optional<ClaimSummary> find(UUID claimId) {
         return claims.find(claimId).map(this::summary);
+    }
+
+    @Override
+    public void refresh() throws SQLException {
+        claims.refresh();
     }
 
     private ClaimSummary summary(LandClaimRecord claim) {
