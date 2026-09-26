@@ -338,10 +338,12 @@ public final class PropertyCommand implements CommandExecutor, TabCompleter {
         UUID propertyId = uuid(args[1], "That property purchase link is no longer valid.");
         PropertyPurchaseResult result = management.purchase(player, propertyId);
         GardenMessages.send(player, result.message());
-        try {
-            claims.refresh();
-        } catch (SQLException exception) {
-            // Ownership is already durable; scheduled cache refresh will reconcile.
+        if (result.success()) {
+            try {
+                claims.refresh();
+            } catch (SQLException exception) {
+                // Ownership is already durable; scheduled cache refresh will reconcile.
+            }
         }
         return true;
     }

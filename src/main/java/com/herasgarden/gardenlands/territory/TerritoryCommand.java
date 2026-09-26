@@ -1,73 +1,61 @@
 package com.herasgarden.gardenlands.territory;
 
-import com.herasgarden.gardencore.api.membership.TerritoryMembershipProvider;
+import com.herasgarden.gardencore.api.society.TerritoryPopulationProvider;
 import com.herasgarden.gardenlands.ui.LandsMessages;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.plugin.RegisteredServiceProvider;
 
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Supplier;
 
 public final class TerritoryCommand implements CommandExecutor, TabCompleter {
     private final TerritoryDirectory territories;
-    private final Supplier<TerritoryMembershipProvider> memberships;
 
-    public TerritoryCommand(TerritoryDirectory territories, Supplier<TerritoryMembershipProvider> memberships) {
+    public TerritoryCommand(TerritoryDirectory territories) {
         this.territories = territories;
-        this.memberships = memberships;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         try {
-            // Territory creation still happens in GardenCore during the migration, so refresh
-            // before player-facing reads to make newly-created territories visible immediately.
             territories.refresh();
             if (args.length == 0 || args[0].equalsIgnoreCase("list")) {
                 List<TerritoryRecord> all = territories.list();
                 if (all.isEmpty()) {
                     LandsMessages.send(sender, "There are no territories yet.");
                 } else {
-                    LandsMessages.send(sender, "Territories: " + String.join(", ", all.stream().map(TerritoryRecord::name).toList()));
+                    LandsMessages.send(sender, "Territories: "
+                            + String.join(", ", all.stream().map(TerritoryRecord::name).toList()));
                 }
                 return true;
             }
             if (args[0].equalsIgnoreCase("population")) {
-                if (args.length < 2) {
-                    LandsMessages.send(sender, "Usage: /territory population <name>");
+                TerritoryRecord territory = requireTerritory(args);
+                TerritoryPopulationProvider provider = populationProvider();
+                if (provider == null) {
+                    LandsMessages.send(sender, "Permanent resident population is unavailable until GardenSociety is enabled.");
                     return true;
                 }
-                String name = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-                TerritoryRecord territory = territories.findByName(name)
-                        .orElseThrow(() -> new IllegalArgumentException("That territory does not exist."));
-                TerritoryMembershipProvider membershipProvider = memberships.get();
-                if (membershipProvider == null) {
-                    LandsMessages.send(sender, "Population data is unavailable because GardenCivics is not enabled.");
-                    return true;
-                }
-                int count = membershipProvider.members(territory.claimId()).size();
-                LandsMessages.send(sender, territory.name() + " population: " + count + ".");
+                LandsMessages.send(sender, territory.name() + " population: "
+                        + provider.population(territory.claimId()) + ".");
                 return true;
             }
             if (args[0].equalsIgnoreCase("info")) {
-                if (args.length < 2) {
-                    LandsMessages.send(sender, "Usage: /territory info <name>");
+                TerritoryRecord territory = requireTerritory(args);
+                TerritoryPopulationProvider provider = populationProvider();
+                if (provider == null) {
+                    LandsMessages.send(sender, territory.name()
+                            + " is registered. Permanent resident population is unavailable until GardenSociety is enabled.");
                     return true;
                 }
-                String name = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-                TerritoryRecord territory = territories.findByName(name)
-                        .orElseThrow(() -> new IllegalArgumentException("That territory does not exist."));
-                TerritoryMembershipProvider membershipProvider = memberships.get();
-                if (membershipProvider == null) {
-                    LandsMessages.send(sender, territory.name() + " is available, but citizenship data is unavailable because GardenCivics is not enabled.");
-                    return true;
-                }
-                int count = membershipProvider.members(territory.claimId()).size();
-                LandsMessages.send(sender, territory.name() + " has " + count + " declared citizen" + (count == 1 ? "" : "s") + ".");
+                int count = provider.population(territory.claimId());
+                LandsMessages.send(sender, territory.name() + " has " + count + " permanent Society resident"
+                        + (count == 1 ? "" : "s") + ".");
                 return true;
             }
             LandsMessages.send(sender, "Usage: /territory <list|info|population>");
@@ -77,6 +65,19 @@ public final class TerritoryCommand implements CommandExecutor, TabCompleter {
             LandsMessages.send(sender, "Territory data could not be loaded right now.");
         }
         return true;
+    }
+
+    private TerritoryRecord requireTerritory(String[] args) {
+        if (args.length < 2) throw new IllegalArgumentException("Enter a territory name.");
+        String name = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+        return territories.findByName(name)
+                .orElseThrow(() -> new IllegalArgumentException("That territory does not exist."));
+    }
+
+    private TerritoryPopulationProvider populationProvider() {
+        RegisteredServiceProvider<TerritoryPopulationProvider> registration =
+                Bukkit.getServicesManager().getRegistration(TerritoryPopulationProvider.class);
+        return registration == null ? null : registration.getProvider();
     }
 
     @Override

@@ -151,7 +151,7 @@ public final class GardenLands extends JavaPlugin {
                 this,
                 ServicePriority.Normal);
 
-        TerritoryCommand territoryCommand = new TerritoryCommand(territoryDirectory, this::membershipProvider);
+        TerritoryCommand territoryCommand = new TerritoryCommand(territoryDirectory);
         PluginCommand territory = getCommand("territory");
         if (territory != null) {
             territory.setExecutor(territoryCommand);
